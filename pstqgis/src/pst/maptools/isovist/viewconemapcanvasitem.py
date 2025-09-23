@@ -76,8 +76,8 @@ BRUSH_EDGE_HOT = QBrush(QCOLOR_EDGE_HOT)
 PEN_EDGE = QPen(QCOLOR_EDGE, EDGE_WIDTH)
 PEN_EDGE_HOT = QPen(QBrush(QCOLOR_EDGE), EDGE_WIDTH_HOT)
 PEN_EDGE_HOVER = QPen(QBrush(QCOLOR_EDGE_HOT), EDGE_WIDTH_HOT)
-PEN_EDGE_HOT_DOTTED = QPen(QBrush(QCOLOR_EDGE), EDGE_WIDTH_HOT, Qt.DashLine)
-PEN_EDGE_HOVER_DOTTED = QPen(QBrush(QCOLOR_EDGE_HOT), EDGE_WIDTH_HOT, Qt.DashLine)
+PEN_EDGE_HOT_DOTTED = QPen(QBrush(QCOLOR_EDGE), EDGE_WIDTH_HOT, Qt.PenStyle.DashLine)
+PEN_EDGE_HOVER_DOTTED = QPen(QBrush(QCOLOR_EDGE_HOT), EDGE_WIDTH_HOT, Qt.PenStyle.DashLine)
 
 ORIGIN_QRECT = QRectF(-ORIGIN_RADIUS, -ORIGIN_RADIUS, ORIGIN_RADIUS * 2, ORIGIN_RADIUS * 2)
 
@@ -411,7 +411,7 @@ class ViewConeMapCanvasItem(QgsMapCanvasItem):
 	def paintBackground(self, painter, option, widget):
 		if self.fov >= 360:
 			painter.setBrush(BRUSH_INSIDE if self.currentElement == ELEMENT_NONE else BRUSH_INSIDE_HOT)
-			painter.setPen(Qt.NoPen)
+			painter.setPen(Qt.PenStyle.NoPen)
 			painter.drawEllipse(self.bbCanvas)
 		else:
 			start_angle_deg = self.directionAngle - self.fov * 0.5
@@ -469,7 +469,7 @@ class ViewConeMapCanvasItem(QgsMapCanvasItem):
 		# Origin
 		if self.currentElement != ELEMENT_NONE:
 			painter.setBrush(BRUSH_EDGE_HOT if self.currentElement == ELEMENT_ORIGIN else BRUSH_EDGE)
-			painter.setPen(Qt.NoPen)
+			painter.setPen(Qt.PenStyle.NoPen)
 			painter.drawEllipse(ORIGIN_QRECT)
 	
 	def paint(self, painter, option, widget):

@@ -32,7 +32,7 @@ class WidgetEnableRadioButton(QRadioButton):
 
 	def addWidget(self, w):
 		self._widgets.append(w)
-		w.setEnabled(Qt.Checked == self.isChecked())
+		w.setEnabled(self.isChecked())
 
 	def onToggled(self, checked):
 		for w in self._widgets:

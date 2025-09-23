@@ -93,7 +93,7 @@ class PropertySheetWidget(QWidget):
 
 	def addNumberProp(self, title, default_value, decimals, unit, prop_name, style=PropertyStyle.LABEL, default_state=PropertyState.CHECKED):
 		edit = QLineEdit()
-		edit.setAlignment(Qt.AlignRight)
+		edit.setAlignment(Qt.AlignmentFlag.AlignRight)
 		unit_label = QLabel(unit)
 		self._page.regProp(prop_name, WizPropFloat(edit, default_value, decimals))
 		widget = None

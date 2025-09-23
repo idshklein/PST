@@ -175,4 +175,4 @@ class PSTPlugin(object):
 			self.initLog()
 			return analysis(self._model, props)
 		wiz = wizard(self.iface.mainWindow(), self._settings, self._model, TaskFactory)
-		wiz.exec_()
+		wiz.exec()

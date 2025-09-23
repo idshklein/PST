@@ -73,7 +73,7 @@ class OriginsPage(BasePage):
 
 		glayout.addWidget(QLabel("Max viewing distance"), y, 0)
 		self._maxRadiusEdit = QLineEdit()
-		self._maxRadiusEdit.setAlignment(Qt.AlignRight)
+		self._maxRadiusEdit.setAlignment(Qt.AlignmentFlag.AlignRight)
 		self.regProp("max_viewing_distance", WizPropFloat(self._maxRadiusEdit, 500, 0))
 		glayout.addWidget(self._maxRadiusEdit, y, 1)
 		glayout.addWidget(QLabel("meters"), y, 2)
@@ -81,7 +81,7 @@ class OriginsPage(BasePage):
 
 		glayout.addWidget(QLabel("Perimeter resolution"), y, 0)
 		self._perimeterResolutionEdit = QLineEdit()
-		self._perimeterResolutionEdit.setAlignment(Qt.AlignRight)
+		self._perimeterResolutionEdit.setAlignment(Qt.AlignmentFlag.AlignRight)
 		self.regProp("perimeter_resolution", WizPropFloat(self._perimeterResolutionEdit, 64, 0))
 		glayout.addWidget(self._perimeterResolutionEdit, y, 1)
 		glayout.addWidget(QLabel("segments"), y, 2)
@@ -116,7 +116,7 @@ class MetricsPage(BasePage):
 
 		glayout.addWidget(QLabel("Max view distance"), y, 0)
 		self._maxRadiusEdit = QLineEdit()
-		self._maxRadiusEdit.setAlignment(Qt.AlignRight)
+		self._maxRadiusEdit.setAlignment(Qt.AlignmentFlag.AlignRight)
 		self.regProp("max_view_distance", WizPropFloat(self._maxRadiusEdit, 500, 0))
 		glayout.addWidget(self._maxRadiusEdit, y, 1)
 		glayout.addWidget(QLabel("meters"), y, 2)

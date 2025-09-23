@@ -24,7 +24,6 @@ NOTE: This file is deprecated and will likely be removed soon.
 """
 
 import math
-import sip
 
 from qgis.PyQt.QtGui import (
 		QBrush,

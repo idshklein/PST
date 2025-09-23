@@ -57,8 +57,8 @@ COLUMN_TYPE_FROM_VARIANT = {
 	QVariant.ULongLong : ("integer", False),  # Is there a better alternative?
 	QVariant.String    : ("string",  True),
 	QVariant.Double    : ("double",  False),
-	QMetaType.Float    : ("float",   False),
 }
+# Note: Qt6 removed QMetaType.Float, so float types are handled as Double
 
 # Type strings from https://api.qgis.org/api/classQgsVectorLayer.html (section "Memory data providerType (memory)")
 # Allowed type strings are "integer", "double" and "string".
@@ -160,7 +160,7 @@ class QGISModel(object):
 				#symbol = QgsLineSymbol.createSimple({})
 				symbol = QgsSymbol.defaultSymbol(geometryType)
 				symbol.setColor(QColor(*r[1]))
-				symbol.symbolLayer(0).setStrokeStyle(Qt.PenStyle(Qt.NoPen))
+				symbol.symbolLayer(0).setStrokeStyle(Qt.PenStyle.NoPen)
 			else:
 				symbol_props['line_color'] = ','.join([str(b) for b in r[1]])
 				symbol = QgsLineSymbol.createSimple(symbol_props)

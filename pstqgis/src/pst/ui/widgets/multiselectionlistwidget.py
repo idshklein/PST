@@ -31,7 +31,7 @@ class MultiSelectionListWidget(QListWidget):
 		selection = []
 		for i in range(self.count()):
 			item = self.item(i)
-			if item.getCheckState() == Qt.Checked:
+			if item.getCheckState() == Qt.CheckState.Checked:
 				selection.append(item.text())
 
 	def setItems(self, items):

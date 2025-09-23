@@ -114,7 +114,7 @@ class LayerSelectionItemModel(QAbstractItemModel):
 			return 0  # This is a flat list; no child items.
 		return 2
 
-	def data(self, index, role=Qt.DisplayRole):
+	def data(self, index, role=Qt.ItemDataRole.DisplayRole):
 		# if not index.isValid() or \
 		#	not (0 <= index.row() < len(self._data)) or \
 		#	not (0 <= index.column() < len(self._data[0])):
@@ -124,24 +124,24 @@ class LayerSelectionItemModel(QAbstractItemModel):
 		rowIndex = index.row()
 
 		if 0 == columnIndex:
-			if role == Qt.DisplayRole:
+			if role == Qt.ItemDataRole.DisplayRole:
 				return self._items[rowIndex].qgisLayer.name()
-			if role == Qt.CheckStateRole:
-				return Qt.Checked if self._items[rowIndex].selected else Qt.Unchecked
-			if role == Qt.DecorationRole:
+			if role == Qt.ItemDataRole.CheckStateRole:
+				return Qt.CheckState.Checked if self._items[rowIndex].selected else Qt.CheckState.Unchecked
+			if role == Qt.ItemDataRole.DecorationRole:
 				return self._items[rowIndex].icon
 		elif 1 == columnIndex:
-			if role == Qt.CheckStateRole:
-				return Qt.Checked if self._items[rowIndex].obstacle else Qt.Unchecked
+			if role == Qt.ItemDataRole.CheckStateRole:
+				return Qt.CheckState.Checked if self._items[rowIndex].obstacle else Qt.CheckState.Unchecked
 
 		return None
 
-	def setData(self, index, value, role=Qt.EditRole):
+	def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
 		columnIndex = index.column()
 		rowIndex = index.row()
 
-		if role == Qt.CheckStateRole:
-			checked = (value == Qt.Checked)
+		if role == Qt.ItemDataRole.CheckStateRole:
+			checked = (value == Qt.CheckState.Checked)
 			if columnIndex == 0:
 				self._items[rowIndex].selected = checked
 				return True
@@ -151,8 +151,8 @@ class LayerSelectionItemModel(QAbstractItemModel):
 
 		return False
 
-	def headerData(self, section, orientation, role=Qt.DisplayRole):
-		if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+	def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
+		if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
 			if section == 0:
 				return "Layer"
 			elif section == 1:

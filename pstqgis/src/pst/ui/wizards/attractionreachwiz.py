@@ -71,7 +71,7 @@ class CalcOptionsPage(BasePage):
 		radius_edit_max_width = QFontMetrics(QApplication.font()).width("8888888888")
 		for dt in self.DIST_MODES:
 			edit = QLineEdit()
-			edit.setAlignment(Qt.AlignRight)
+			edit.setAlignment(Qt.AlignmentFlag.AlignRight)
 			edit.setFixedWidth(radius_edit_max_width)
 			unit = QLabel(dt[2])
 			checkbox = WidgetEnableCheckBox(dt[0], [edit, unit])

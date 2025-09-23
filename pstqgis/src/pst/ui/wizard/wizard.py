@@ -57,7 +57,7 @@ class WizProp(object):
 		elif isinstance(widget, QDoubleSpinBox):
 			widget.setValue(value)
 		elif isinstance(widget, QCheckBox):
-			widget.setCheckState(Qt.Checked if bool(value) else Qt.Unchecked)
+			widget.setCheckState(Qt.CheckState.Checked if bool(value) else Qt.CheckState.Unchecked)
 		elif isinstance(widget, QRadioButton):
 			widget.setChecked(bool(value))
 		elif isinstance(widget, QComboBox):
@@ -65,7 +65,7 @@ class WizProp(object):
 		elif isinstance(widget, QListWidget):
 			for i in range(widget.count()):
 				if widget.item(i).text() in value:
-					widget.item(i).setCheckState(Qt.Checked)
+					widget.item(i).setCheckState(Qt.CheckState.Checked)
 		else:
 			assert(False)
 
@@ -77,13 +77,13 @@ class WizProp(object):
 		if isinstance(widget, QLineEdit):
 			return widget.text()
 		if isinstance(widget, QCheckBox):
-			return (widget.checkState() == Qt.Checked)
+			return (widget.checkState() == Qt.CheckState.Checked)
 		if isinstance(widget, QRadioButton):
 			return widget.isChecked()
 		if isinstance(widget, QComboBox):
 			return widget.currentText()
 		if isinstance(widget, QListWidget):
-			return [widget.item(i).text() for i in range(widget.count()) if widget.item(i).checkState() == Qt.Checked]
+			return [widget.item(i).text() for i in range(widget.count()) if widget.item(i).checkState() == Qt.CheckState.Checked]
 		return widget.value()
 
 
@@ -189,9 +189,9 @@ class BaseWiz(QWizard):
 		self._model = model  # TODO: Remove?
 		self._title = title
 		self._props = {}
-		self.setWizardStyle(QWizard.ModernStyle)
+		self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
 		self.setTitle(title)
-		self.setOption(QWizard.NoBackButtonOnLastPage, True)
+		self.setOption(QWizard.WizardOption.NoBackButtonOnLastPage, True)
 		self.loadProperties()
 
 	def setTitle(self, title):
@@ -301,7 +301,7 @@ class BaseWiz(QWizard):
 		if isinstance(widget, QLineEdit):
 			return widget.text()
 		if isinstance(widget, QCheckBox):
-			return (widget.checkState() == Qt.Checked)
+			return (widget.checkState() == Qt.CheckState.Checked)
 		if isinstance(widget, QComboBox):
 			return widget.currentText()
 		return widget.value()

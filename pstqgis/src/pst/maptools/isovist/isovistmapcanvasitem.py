@@ -132,7 +132,7 @@ class IsovistMapCanvasItem(ViewConeMapCanvasItem):
 			painter.setPen(self._penEdge)
 			painter.drawPolygon(self.polygon)
 
-			painter.setPen(Qt.NoPen)
+			painter.setPen(Qt.PenStyle.NoPen)
 			painter.setBrush(BRUSH_EDGE)
 			painter.drawEllipse(int(MID_POINT_DIAMETER * -0.5), int(MID_POINT_DIAMETER * -0.5), MID_POINT_DIAMETER, MID_POINT_DIAMETER)
 

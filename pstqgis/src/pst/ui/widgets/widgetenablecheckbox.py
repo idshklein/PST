@@ -32,9 +32,9 @@ class WidgetEnableCheckBox(QCheckBox):
 
 	def addWidget(self, w):
 		self._widgets.append(w)
-		w.setEnabled(Qt.Checked == self.checkState())
+		w.setEnabled(Qt.CheckState.Checked == self.checkState())
 
 	def onStateChanged(self, state):
-		enabled = (Qt.Checked == state)
+		enabled = (Qt.CheckState.Checked == state)
 		for w in self._widgets:
 			w.setEnabled(enabled)

@@ -29,7 +29,7 @@ class ReadyPage(QWizardPage):
 		self.setSubTitle(sub_title)
 		self.setCommitPage(True)
 		self.createWidgets()
-		self.setButtonText(QWizard.CommitButton, "Start")
+		self.setButtonText(QWizard.WizardButton.CommitButton, "Start")
 
 	def createWidgets(self):
 		vlayout = QVBoxLayout()

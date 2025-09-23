@@ -97,7 +97,7 @@ class MultiSelListDialog(QDialog):
 		for text, checked in items:
 			item = QListWidgetItem(text, self._list)
 			item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-			item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+			item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
 			self._list.addItem(item)
 		vlayout.addWidget(self._list)
 		vlayout.addSpacing(10)
@@ -112,7 +112,7 @@ class MultiSelListDialog(QDialog):
 		self.setLayout(vlayout)
 
 	def selectedIndices(self):
-		return [index for index in range(self._list.count()) if self._list.item(index).checkState() == Qt.Checked]
+		return [index for index in range(self._list.count()) if self._list.item(index).checkState() == Qt.CheckState.Checked]
 
 	def _onOk(self):
 		pass
@@ -154,10 +154,10 @@ class LayerCounterItemModel(QAbstractItemModel):
 			return 0  # This is a flat list; no child items.
 		return 2
 
-	def data(self, index, role=Qt.DisplayRole):
+	def data(self, index, role=Qt.ItemDataRole.DisplayRole):
 		columnIndex = index.column()
 		rowIndex = index.row()
-		if role == Qt.DisplayRole:
+		if role == Qt.ItemDataRole.DisplayRole:
 			if not self._isovistLayers:
 				return "No layers" if columnIndex == 0 else None
 			if 0 == columnIndex:
@@ -166,8 +166,8 @@ class LayerCounterItemModel(QAbstractItemModel):
 				return str(self._isovistLayers[rowIndex].visibleCount)
 		return None
 
-	def headerData(self, section, orientation, role=Qt.DisplayRole):
-		if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+	def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
+		if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
 			if section == 0:
 				return "Layer"
 			elif section == 1:
@@ -299,7 +299,7 @@ class IsovistToolWindow(QWidget):
 		self._colorPicker.colorSelected.connect(lambda color: self.onColorChanged(color, False))
 		self._addField("Color", self._colorPicker, None, glayout)
 
-		self._opacitySlider = QSlider(Qt.Horizontal, self)
+		self._opacitySlider = QSlider(Qt.Orientation.Horizontal, self)
 		self._opacitySlider.setMinimum(0)
 		self._opacitySlider.setMaximum(255)
 		self._opacitySlider.setSliderPosition(self._opacity)
@@ -350,7 +350,7 @@ class IsovistToolWindow(QWidget):
 
 	def _createLineEdit(self, value, minValue = 0, maxValue = 1000000, decimalCount = 2, changedSlot = None, readOnly = False):
 		lineEdit = QLineEdit(self.locale.toString(float(value), 'f', 2))
-		lineEdit.setAlignment(Qt.AlignRight)
+		lineEdit.setAlignment(Qt.AlignmentFlag.AlignRight)
 		validator = QDoubleValidator(minValue, maxValue, decimalCount, self)
 		validator.setLocale(self.locale)
 		lineEdit.setValidator(validator)

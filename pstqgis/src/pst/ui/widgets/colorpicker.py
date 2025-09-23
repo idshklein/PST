@@ -58,7 +58,7 @@ class ColorPicker(QFrame):
 
 	def paintEvent(self, paintEvent):
 		painter = QPainter(self)
-		painter.setPen(Qt.NoPen)
+		painter.setPen(Qt.PenStyle.NoPen)
 		painter.setBrush(self._brush)
 		# painter.drawRect(paintEvent.rect().adjusted(1,1,-1-1))
 		self.styleoption.rect = self.contentsRect()

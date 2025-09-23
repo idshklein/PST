@@ -30,8 +30,8 @@ class FinishPage(QWizardPage):
 
 		self.createWidgets()
 
-		self.setButtonText(QWizard.FinishButton, "Restart")
-		self.setButtonText(QWizard.CancelButton, "Close")
+		self.setButtonText(QWizard.WizardButton.FinishButton, "Restart")
+		self.setButtonText(QWizard.WizardButton.CancelButton, "Close")
 
 	def createWidgets(self):
 		vlayout = QVBoxLayout()
