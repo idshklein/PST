@@ -38,6 +38,6 @@ class MultiSelectionListWidget(QListWidget):
 		self.clear()
 		for name in items:
 			item = QListWidgetItem(name)
-			item.setFlags(item.flags() or Qt.ItemIsUserCheckable)
-			item.setCheckState(Qt.Unchecked)
+			item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+			item.setCheckState(Qt.CheckState.Unchecked)
 			self.addItem(item)
