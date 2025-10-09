@@ -55,7 +55,7 @@ class CalcOptionsPage(BasePage):
 		("Axial/segment lines (steps)",     False, "dist_steps"),
 		("Angle (degrees)",                 False, "dist_angular"),
 		("Axialmeter (steps*meters)",       False, "dist_axmeter"),
-		("Attribute-based weight (varies)", False, "dist_weights"),
+		("Attribute-based cost (varies)", False, "dist_weights"),
 	]
 
 	def __init__(self):
@@ -93,21 +93,21 @@ class CalcOptionsPage(BasePage):
 class WeightPage(BasePage):
 	def __init__(self):
 		BasePage.__init__(self)
-		self.setTitle("Custom weight settings")
+		self.setTitle("Custom cost settings")
 		self.setSubTitle(" ")
 		self.createWidgets()
 
 	def createWidgets(self):
 		prop_sheet = PropertySheetWidget(self)
-		prop_sheet.newSection("Weights configuration")
+		prop_sheet.newSection("Origin-Destination link to line")
 
 		self._dist_weightsCombo = QComboBox()
-		prop_sheet.add(QLabel("Line weight attribute"), self._dist_weightsCombo)
+		prop_sheet.add(QLabel("Line cost attribute"), self._dist_weightsCombo)
 		self.regProp("dw_attribute", WizProp(self._dist_weightsCombo, ""))
 
-		self._point_connection_weightSpinBox = QDoubleSpinBox()	
+		self._point_connection_weightSpinBox = QDoubleSpinBox()
 		self._point_connection_weightSpinBox.setRange(0, 99999)
-		prop_sheet.add(QLabel("Point connection weight"), self._point_connection_weightSpinBox, QLabel("per meter"))
+		prop_sheet.add(QLabel("Cost/Distance from Origin-Destination to nearest line"), self._point_connection_weightSpinBox, QLabel("per meter"))
 		self.regProp("point_connection_weight", WizProp(self._point_connection_weightSpinBox, 0))
 
 

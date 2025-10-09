@@ -119,9 +119,12 @@ class AngularBetweennessAnalysis(BaseAnalysis):
 				if scores_std is not None:
 					pstalgo.StandardNormalize(scores, scores.size(), scores_std)
 					columns.append((GenerateScoreColumnName(weigh_by_length, radii, ColName.NORM_STANDARD), 'float', scores_std.values()))
-				# Syntax normalization
+				# Syntax normalization (NACH)
+				# Note: FastSegmentBetweenness only computes total_depth (not total_depth_weight),
+				# so we use total_depths here. This differs from AngularChoice which can compute
+				# both total_depth and total_depth_weight depending on weigh_by_length setting.
 				if scores_syntax is not None:
-					pstalgo.AngularChoiceSyntaxNormalize(scores, total_depth_weights, scores.size(), scores_syntax)
+					pstalgo.AngularChoiceSyntaxNormalize(scores, total_depths, scores.size(), scores_syntax)
 					columns.append((GenerateScoreColumnName(weigh_by_length, radii, ColName.NORM_SYNTAX_NACH), 'float', scores_syntax.values()))
 				if output_counters:
 					# N
