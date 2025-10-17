@@ -125,14 +125,17 @@ class AttractionDistanceAnalysis(BaseAnalysis):
 			attr_points_temp = None
 			attr_points_per_polygon_temp = None
 
-			# Read line weights
+			# Read line weights - save values with distinct names to avoid overwriting in loop
+			line_weights_for_weights_mode = None
+			point_connection_weight_value = 0
 			if pstalgo.DistanceType.WEIGHTS in distance_types:
 				progress.setCurrentTask(Tasks.READ_WEIGHTS)
 				line_weight_table = props['in_network']
 				line_weight_attribute = props['dw_attribute']
-				point_connection_weight = props['point_connection_weight']
+				point_connection_weight_value = props['point_connection_weight']
 				weight_values = Vector(ctypes.c_float, line_rows.size(), stack_allocator)
 				self._model.readValues(line_weight_table, line_weight_attribute, line_rows, weight_values, progress)
+				line_weights_for_weights_mode = weight_values
 
 
 			progress.setCurrentTask(Tasks.ANALYSIS)
@@ -153,9 +156,10 @@ class AttractionDistanceAnalysis(BaseAnalysis):
 					# Allocate output arrays
 					scores = Vector(ctypes.c_float, output_count, stack_allocator, output_count)
 					destination_indices = Vector(ctypes.c_int, output_count, stack_allocator, output_count) if dst_attr_to_org_enabled else None
-					# Analysis
+					# Analysis - select correct parameters for each distance type
 					if distance_type == pstalgo.DistanceType.WEIGHTS:
-						line_weights = weight_values
+						line_weights = line_weights_for_weights_mode
+						point_connection_weight = point_connection_weight_value
 					else:
 						line_weights = None
 						point_connection_weight = 0
