@@ -157,6 +157,23 @@ class WizPropCombo(object):
 		self._combobox = combobox
 		self._default = default
 
+		# Validate default exists in combo box (if already populated)
+		# This catches developer errors at creation time
+		if combobox.count() > 0:
+			found = False
+			for i in range(combobox.count()):
+				if combobox.itemData(i) == default:
+					found = True
+					break
+
+			if not found:
+				available = [combobox.itemData(i) for i in range(combobox.count())]
+				raise ValueError(
+					f"WizPropCombo: Default value '{default}' not found in combo box. "
+					f"Available values: {available}. "
+					f"This is a developer error - please fix the wizard code."
+				)
+
 	def value(self):
 		return self._combobox.itemData(self._combobox.currentIndex())
 
@@ -164,19 +181,32 @@ class WizPropCombo(object):
 		return self._default
 
 	def setValue(self, value):
+		"""Set combo box to value, with fallback to default and first item."""
+
+		# Handle None value
 		if value is None:
 			if self._combobox.count() > 0:
 				self._combobox.setCurrentIndex(0)
-				return
+			return  # Always return when value is None
+
+		# Try to find the requested value
 		for i in range(self._combobox.count()):
 			if self._combobox.itemData(i) == value:
 				self._combobox.setCurrentIndex(i)
 				return
+
+		# Value not found - try default
 		for i in range(self._combobox.count()):
 			if self._combobox.itemData(i) == self._default:
 				self._combobox.setCurrentIndex(i)
-				return
-		raise Exception("Default value not found in combo box!")
+				return  # Success - default found
+
+		# Neither value nor default found
+		# Raise exception to be caught by restorePageProperties()
+		raise Exception(
+			f"WizPropCombo: Neither value '{value}' nor default '{self._default}' "
+			f"found in combo box with {self._combobox.count()} items"
+		)
 
 	def toString(self, value):
 		return str(value)
@@ -257,11 +287,44 @@ class BaseWiz(QWizard):
 		QWizard.cleanupPage(self, id)
 
 	def restorePageProperties(self, page):
+		"""Restore saved values for all properties on the page."""
+		from qgis.PyQt.QtWidgets import QMessageBox
+
+		restoration_failures = []
+
 		for name, prop in page._props.items():
 			value = self._props.get(name)
 			if value is None:
 				value = prop.default()
-			prop.setValue(value)
+
+			try:
+				prop.setValue(value)
+			except Exception as e:
+				# Property restoration failed - collect for batch notification
+				restoration_failures.append({
+					'name': name,
+					'value': value,
+					'error': str(e)
+				})
+
+				# Apply fallback: try to select first item in combo box
+				if hasattr(prop, '_combobox') and prop._combobox.count() > 0:
+					prop._combobox.setCurrentIndex(0)
+
+		# Show single warning dialog for all failures (if any)
+		if restoration_failures:
+			failure_list = "\n".join([
+				f"• {f['name']}"
+				for f in restoration_failures
+			])
+
+			QMessageBox.warning(
+				self,
+				"Settings Restored with Defaults",
+				f"Some of your saved settings are no longer available and have been "
+				f"reset to defaults:\n\n{failure_list}\n\n"
+				f"Please review your settings before proceeding."
+			)
 
 	def collectPageProperties(self, page):
 		page.collectProperties(self._props)
