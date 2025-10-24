@@ -99,7 +99,7 @@ class WeightPage(BasePage):
 
 	def createWidgets(self):
 		prop_sheet = PropertySheetWidget(self)
-		prop_sheet.newSection("Origin-Destination link to line")
+		prop_sheet.newSection("Origin/Destination link to line")
 
 		self._dist_weightsCombo = QComboBox()
 		prop_sheet.add(QLabel("Line cost attribute"), self._dist_weightsCombo)
@@ -107,7 +107,7 @@ class WeightPage(BasePage):
 
 		self._point_connection_weightSpinBox = QDoubleSpinBox()
 		self._point_connection_weightSpinBox.setRange(0, 99999)
-		prop_sheet.add(QLabel("Cost/Distance from Origin-Destination to nearest line"), self._point_connection_weightSpinBox, QLabel("per meter"))
+		prop_sheet.add(QLabel("Cost/Distance from Origin/Destination to nearest line"), self._point_connection_weightSpinBox, QLabel("per meter"))
 		self.regProp("point_connection_weight", WizProp(self._point_connection_weightSpinBox, 0))
 
 
