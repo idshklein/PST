@@ -68,7 +68,7 @@ class CalcOptionsPage(BasePage):
 	def createWidgets(self):
 		dist_type_sheet = PropertySheetWidget(self)
 		dist_type_sheet.newSection("Distance modes and radii")
-		radius_edit_max_width = QFontMetrics(QApplication.font()).width("8888888888")
+		radius_edit_max_width = QFontMetrics(QApplication.font()).horizontalAdvance("8888888888")
 		for dt in self.DIST_MODES:
 			edit = QLineEdit()
 			edit.setAlignment(Qt.AlignmentFlag.AlignRight)
