@@ -71,7 +71,7 @@ class ColName(object):
 
 	# Extra
 	EXTRA_NODE_COUNT       = "N"
-	EXTRA_TOTAL_DEPTH      = "T"
+	EXTRA_TOTAL_DEPTH      = "D"
 	EXTRA_MEAN_DEPTH       = "M"
 	EXTRA_LENGTH           = "L"
 	EXTRA_AREA_CONVEX_HULL = "a"
