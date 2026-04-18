@@ -24,7 +24,7 @@ from builtins import str
 from builtins import object
 from qgis.PyQt.QtCore import QTimer
 from qgis.PyQt.QtWidgets import QApplication, QLabel, QMessageBox, QProgressBar, QVBoxLayout, QWizardPage
-from ...analyses import AnalysisException
+from ...analyses import AnalysisException, AnalysisDelegateFilter
 
 class ProgressPage(QWizardPage):
 	def __init__(self, title = "Performing analysis", sub_title = " "):
@@ -131,50 +131,3 @@ class ProgressPage(QWizardPage):
 	# slot, unused
 	def onTaskProgressChanged(self, progress):
 		self.setProgress(progress)
-
-
-import time
-class AnalysisDelegateFilter(object):
-	def __init__(self, delegate, min_interval_sec=0.1):
-		self._delegate = delegate
-		self._minIntervalSec = min_interval_sec
-		self._tsLastUpdate = -1
-		# DEBUG
-		self._statusText = None
-		self._tsLastStatus = -1
-		# DEBUG
-
-	def outputStats(self):
-		pass
-
-	# AnalysisDelegate interface
-	def setProgress(self, progress):
-		if self._testFrequencyFilter():
-			self._delegate.setProgress(progress)
-
-	# AnalysisDelegate interface
-	def setStatus(self, text):
-		# DEBUG
-		ts = time.perf_counter()
-		if self._statusText:
-			print("%s (%.3f sec)" % (self._statusText, ts - self._tsLastStatus))
-		self._statusText = text
-		self._tsLastStatus = ts
-		# DEBUG
-
-		self._delegate.setStatus(text)
-		self._resetFrequencyFilter()
-
-	# AnalysisDelegate interface
-	def getCancel(self):
-		return self._delegate.getCancel()
-
-	def _resetFrequencyFilter(self):
-		self._tsLastUpdate = -1
-
-	def _testFrequencyFilter(self):
-		ts = time.perf_counter()
-		if ts - self._tsLastUpdate < self._minIntervalSec:
-			return False
-		self._tsLastUpdate = ts;
-		return True

@@ -25,9 +25,10 @@ from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QMessageBox
 from qgis.core import *
-from qgis.core import Qgis, QgsMessageLog
+from qgis.core import Qgis, QgsApplication, QgsMessageLog
 from . import analyses
 from .model import QGISModel, Settings
+from .processing import PstProcessingProvider
 from .ui import wizards
 from . import APP_TITLE
 from .maptools import IsovistMapTool
@@ -53,6 +54,7 @@ class PSTPlugin(object):
 		self._logHandle = None
 		self._rootPath = str(pathlib.Path(__file__).parent.resolve())
 		self._vectorToolBarActions = []
+		self._processingProvider = None
 
 	def resolveLocalPath(self, localPath):
 		return os.path.join(self._rootPath, localPath)
@@ -64,6 +66,7 @@ class PSTPlugin(object):
 			self.iface.addPluginToVectorMenu(MENU_TITLE, a)
 		if ENABLE_MAP_TOOLS:
 			self.initToolbar()
+		self.initProcessing()
 
 	def unload(self):
 		# Remove menu
@@ -71,6 +74,16 @@ class PSTPlugin(object):
 			self.iface.removePluginVectorMenu(MENU_TITLE, a)
 		if ENABLE_MAP_TOOLS:
 			self.uninitToolbar()
+		self.uninitProcessing()
+
+	def initProcessing(self):
+		self._processingProvider = PstProcessingProvider()
+		QgsApplication.processingRegistry().addProvider(self._processingProvider)
+
+	def uninitProcessing(self):
+		if self._processingProvider is not None:
+			QgsApplication.processingRegistry().removeProvider(self._processingProvider)
+			self._processingProvider = None
 
 	def createMapToolAction(self, tool, name, icon = None, menu = None):
 		icon = QIcon(self.resolveLocalPath(icon)) if isinstance(icon, str) else icon

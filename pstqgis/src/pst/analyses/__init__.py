@@ -19,6 +19,7 @@ You should have received a copy of the GNU Lesser General Public License
 along with PST. If not, see <http://www.gnu.org/licenses/>.
 """
 
+from .analysisdelegate import AnalysisDelegateFilter
 from .angularchoiceanalysis import AngularChoiceAnalysis
 from .angularbetweennessanalysis import AngularBetweennessAnalysis
 from .angularintegrationanalysis import AngularIntegrationAnalysis
