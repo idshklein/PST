@@ -3,7 +3,8 @@ name: Build macOS Library
 # When to run this workflow
 on:
   push:
-    branches: [ qt6 ]           # Run automatically on pushes to qt6 branch
+    branches:
+      - 'build-binaries-*'      # Auto-run on any branch named build-binaries-*
   workflow_dispatch:            # Also allow manual trigger from GitHub UI
 
 jobs:
