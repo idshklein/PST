@@ -21,6 +21,13 @@ along with PST. If not, see <http://www.gnu.org/licenses/>.
 
 from qgis.core import QgsProcessingProvider
 from .odbetweenness_algorithm import ODBetweennessAlgorithm
+from .phase1_algorithms import (
+    AngularChoiceAlgorithm,
+    AngularIntegrationAlgorithm,
+    NetworkBetweennessAlgorithm,
+    NetworkIntegrationAlgorithm,
+    ReachAlgorithm,
+)
 
 
 class PstProcessingProvider(QgsProcessingProvider):
@@ -43,6 +50,11 @@ class PstProcessingProvider(QgsProcessingProvider):
         Loads all algorithms belonging to this provider.
         """
         self.addAlgorithm(ODBetweennessAlgorithm())
+        self.addAlgorithm(AngularIntegrationAlgorithm())
+        self.addAlgorithm(AngularChoiceAlgorithm())
+        self.addAlgorithm(ReachAlgorithm())
+        self.addAlgorithm(NetworkIntegrationAlgorithm())
+        self.addAlgorithm(NetworkBetweennessAlgorithm())
 
     def id(self):
         """
