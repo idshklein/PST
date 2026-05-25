@@ -1,0 +1,66 @@
+name: Build QGIS Plugin Zip
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'build-plugin-*'
+
+jobs:
+  package-plugin:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure and build pstalgo
+        run: |
+          cmake -S pstalgo -B pstalgo/build
+          cmake --build pstalgo/build --config Release --parallel
+
+      - name: Assemble plugin directory
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          rm -rf pstqgis/deploy
+          mkdir -p pstqgis/deploy/pst
+
+          cp pstqgis/src/pst/*.py pstqgis/deploy/pst/
+          cp pstqgis/src/pst/*.png pstqgis/deploy/pst/ || true
+          cp pstqgis/src/pst/metadata.txt pstqgis/deploy/pst/
+          cp pstqgis/doc/readme.txt pstqgis/deploy/pst/
+
+          mkdir -p pstqgis/deploy/pst/pstalgo/bin
+          mkdir -p pstqgis/deploy/pst/pstalgo/python
+
+          if [ -f pstalgo/bin/libpstalgo.dylib ]; then
+            cp pstalgo/bin/libpstalgo.dylib pstqgis/deploy/pst/pstalgo/bin/
+          elif [ -f pstalgo/build/bin/libpstalgo.dylib ]; then
+            cp pstalgo/build/bin/libpstalgo.dylib pstqgis/deploy/pst/pstalgo/bin/
+          else
+            find pstalgo -name 'libpstalgo.dylib' -print -exec cp {} pstqgis/deploy/pst/pstalgo/bin/ \;
+          fi
+
+          cp -R pstalgo/python/. pstqgis/deploy/pst/pstalgo/python/
+          cp -R pstqgis/src/pst/analyses pstqgis/deploy/pst/
+          cp -R pstqgis/src/pst/img pstqgis/deploy/pst/ || true
+          cp -R pstqgis/src/pst/maptools pstqgis/deploy/pst/
+          cp -R pstqgis/src/pst/model pstqgis/deploy/pst/
+          cp -R pstqgis/src/pst/processing pstqgis/deploy/pst/
+          cp -R pstqgis/src/pst/ui pstqgis/deploy/pst/
+
+      - name: Create plugin zip
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd pstqgis/deploy
+          zip -r ../../pstqgis-plugin-macos.zip pst
+
+      - name: Upload plugin zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pstqgis-plugin-macos
+          path: pstqgis-plugin-macos.zip
+          retention-days: 30
