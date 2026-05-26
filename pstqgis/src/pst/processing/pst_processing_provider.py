@@ -24,6 +24,7 @@ from .odbetweenness_algorithm import ODBetweennessAlgorithm
 from .phase1_algorithms import (
     AngularChoiceAlgorithm,
     AngularIntegrationAlgorithm,
+    CreateSegmentMapAlgorithm,
     NetworkBetweennessAlgorithm,
     NetworkIntegrationAlgorithm,
     ReachAlgorithm,
@@ -55,6 +56,7 @@ class PstProcessingProvider(QgsProcessingProvider):
         self.addAlgorithm(ReachAlgorithm())
         self.addAlgorithm(NetworkIntegrationAlgorithm())
         self.addAlgorithm(NetworkBetweennessAlgorithm())
+        self.addAlgorithm(CreateSegmentMapAlgorithm())
 
     def id(self):
         """
