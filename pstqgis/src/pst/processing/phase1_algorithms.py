@@ -467,16 +467,18 @@ class CreateSegmentMapAlgorithm(PstProcessingAlgorithmBase):
     COPY_COLUMN = 'COPY_COLUMN'
     COPY_COLUMN_OUT = 'COPY_COLUMN_OUT'
 
-    _NETWORK_TYPES = [
-        ('Axial or segment', 'AXIAL_OR_SEGMENT'),
-        ('Road center lines', 'ROAD_CENTER_LINES'),
-    ]
+    def _network_types(self):
+        import pstalgo
+        return [
+            pstalgo.RoadNetworkType.ToString(pstalgo.RoadNetworkType.AXIAL_OR_SEGMENT),
+            pstalgo.RoadNetworkType.ToString(pstalgo.RoadNetworkType.ROAD_CENTER_LINES),
+        ]
 
     def initAlgorithm(self, config):
         self.addParameter(QgsProcessingParameterEnum(
             self.NETWORK_TYPE,
             self.tr('Network type'),
-            options=[entry[0] for entry in self._NETWORK_TYPES],
+            options=self._network_types(),
             defaultValue=0,
         ))
         self.addParameter(QgsProcessingParameterVectorLayer(
@@ -525,7 +527,7 @@ class CreateSegmentMapAlgorithm(PstProcessingAlgorithmBase):
 
     def _collectProperties(self, parameters, context):
         props = {}
-        props['in_network_type'] = self._NETWORK_TYPES[self.parameterAsEnum(parameters, self.NETWORK_TYPE, context)][1]
+        props['in_network_type'] = self._network_types()[self.parameterAsEnum(parameters, self.NETWORK_TYPE, context)]
         props['in_network'] = self.NETWORK
         props['in_unlinks'] = self.UNLINKS
         props['in_unlinks_enabled'] = self.parameterAsVectorLayer(parameters, self.UNLINKS, context) is not None
