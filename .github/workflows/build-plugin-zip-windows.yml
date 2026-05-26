@@ -1,0 +1,71 @@
+name: Build QGIS Plugin Zip (Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'build-plugin-win-*'
+
+jobs:
+  package-plugin:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build pstalgo x64 Release
+        shell: cmd
+        run: |
+          msbuild pstalgo\vc\pstalgo.vcxproj /p:Configuration=Release /p:Platform=x64
+
+      - name: Inspect build outputs
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse pstalgo | Where-Object { $_.Name -match 'pstalgo.*\.dll$' -or $_.Name -match 'pstalgo.*\.pyd$' -or $_.Name -eq 'pstalgo64.dll' -or $_.Name -eq 'pstalgo32.dll' } | Select-Object FullName
+          Get-ChildItem -Recurse pstalgo\python | Select-Object FullName
+
+      - name: Assemble plugin directory
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          Remove-Item -Recurse -Force pstqgis\deploy -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path pstqgis\deploy\pst | Out-Null
+
+          Copy-Item pstqgis\src\pst\*.py pstqgis\deploy\pst\
+          Copy-Item pstqgis\src\pst\*.png pstqgis\deploy\pst\ -ErrorAction SilentlyContinue
+          Copy-Item pstqgis\src\pst\metadata.txt pstqgis\deploy\pst\
+          Copy-Item pstqgis\doc\readme.txt pstqgis\deploy\pst\
+
+          foreach ($dir in @('analyses','img','maptools','model','processing','ui')) {
+            if (Test-Path "pstqgis\src\pst\$dir") {
+              Copy-Item -Recurse "pstqgis\src\pst\$dir" "pstqgis\deploy\pst\"
+            }
+          }
+
+          New-Item -ItemType Directory -Force -Path pstqgis\deploy\pst\pstalgo\bin | Out-Null
+          New-Item -ItemType Directory -Force -Path pstqgis\deploy\pst\pstalgo\python | Out-Null
+
+          Copy-Item -Recurse pstalgo\python\* pstqgis\deploy\pst\pstalgo\python\
+
+          $dlls = Get-ChildItem -Recurse pstalgo -Filter *64.dll
+          if (-not $dlls) {
+            throw 'Could not find a *64.dll build output for pstalgo.'
+          }
+          $dlls | Copy-Item -Destination pstqgis\deploy\pst\pstalgo\bin\
+
+      - name: Create plugin zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path pstqgis\deploy\pst -DestinationPath pstqgis-plugin-windows.zip -Force
+
+      - name: Upload plugin zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pstqgis-plugin-windows
+          path: pstqgis-plugin-windows.zip
+          retention-days: 30
