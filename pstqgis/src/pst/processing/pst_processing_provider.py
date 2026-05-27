@@ -29,6 +29,14 @@ from .phase1_algorithms import (
     NetworkIntegrationAlgorithm,
     ReachAlgorithm,
 )
+from .phase2_algorithms import (
+    AngularBetweennessAlgorithm,
+    AttractionBetweennessAlgorithm,
+    AttractionDistanceAlgorithm,
+    AttractionReachAlgorithm,
+    SegmentGroupingAlgorithm,
+    SegmentGroupIntegrationAlgorithm,
+)
 
 
 class PstProcessingProvider(QgsProcessingProvider):
@@ -53,10 +61,16 @@ class PstProcessingProvider(QgsProcessingProvider):
         self.addAlgorithm(ODBetweennessAlgorithm())
         self.addAlgorithm(AngularIntegrationAlgorithm())
         self.addAlgorithm(AngularChoiceAlgorithm())
+        self.addAlgorithm(AngularBetweennessAlgorithm())
         self.addAlgorithm(ReachAlgorithm())
         self.addAlgorithm(NetworkIntegrationAlgorithm())
         self.addAlgorithm(NetworkBetweennessAlgorithm())
         self.addAlgorithm(CreateSegmentMapAlgorithm())
+        self.addAlgorithm(SegmentGroupingAlgorithm())
+        self.addAlgorithm(SegmentGroupIntegrationAlgorithm())
+        self.addAlgorithm(AttractionDistanceAlgorithm())
+        self.addAlgorithm(AttractionReachAlgorithm())
+        self.addAlgorithm(AttractionBetweennessAlgorithm())
 
     def id(self):
         """
