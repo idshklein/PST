@@ -21,10 +21,62 @@ along with PST. If not, see <http://www.gnu.org/licenses/>.
 
 from builtins import range
 from builtins import object
+import atexit
 import ctypes
 from .base import AnalysisException
 from qgis.core import QgsMessageLog, QgsRectangle, QgsProject, QgsProcessingUtils, QgsRasterDataProvider, QgsRasterLayer, QgsRasterShader, QgsColorRampShader, QgsSingleBandPseudoColorRenderer
 from osgeo import gdal
+
+class RowIdBuffer(object):
+	def __init__(self, row_ids):
+		if row_ids is None:
+			self._row_ids = ()
+		elif hasattr(row_ids, 'values'):
+			self._row_ids = tuple(row_ids.values())
+		else:
+			self._row_ids = tuple(row_ids)
+
+	def size(self):
+		return len(self._row_ids)
+
+	def at(self, index):
+		return self._row_ids[index]
+
+	def values(self):
+		return iter(self._row_ids)
+
+	def __len__(self):
+		return len(self._row_ids)
+
+	def __getitem__(self, index):
+		return self._row_ids[index]
+
+
+class _CachedAxialGraph(object):
+	def __init__(self, key, graph_handle, line_rows, point_rows, free_graph):
+		self.key = key
+		self.graph_handle = graph_handle
+		self.line_rows = RowIdBuffer(line_rows)
+		self.point_rows = RowIdBuffer(point_rows) if point_rows is not None else None
+		self._free_graph = free_graph
+
+	def free(self):
+		if self.graph_handle:
+			self._free_graph(self.graph_handle)
+			self.graph_handle = None
+
+
+_CACHED_AXIAL_GRAPH = None
+
+
+def _clear_cached_axial_graph():
+	global _CACHED_AXIAL_GRAPH
+	if _CACHED_AXIAL_GRAPH is not None:
+		_CACHED_AXIAL_GRAPH.free()
+		_CACHED_AXIAL_GRAPH = None
+
+
+atexit.register(_clear_cached_axial_graph)
 
 class MultiTaskProgressDelegate(object):
 	def __init__(self, delegate):
@@ -182,6 +234,45 @@ def BuildAxialGraph(model, pstalgo, stack_allocator, network_table, unlink_table
 	stack_allocator.restore(final_alloc_state)
 
 	return (graph, line_rows, point_rows)
+
+def _graph_cache_key(model, network_table, unlink_table, point_table, poly_edge_point_interval):
+	def layer_key(table_name):
+		if table_name is None:
+			return None
+		layer = model._layerFromName(table_name)
+		return (layer.id(), layer.source(), layer.featureCount())
+
+	return (
+		layer_key(network_table),
+		layer_key(unlink_table),
+		layer_key(point_table),
+		poly_edge_point_interval,
+	)
+
+def BuildAxialGraphCached(model, pstalgo, stack_allocator, network_table, unlink_table, point_table, progress, poly_edge_point_interval=0):
+	global _CACHED_AXIAL_GRAPH
+
+	key = _graph_cache_key(model, network_table, unlink_table, point_table, poly_edge_point_interval)
+	if _CACHED_AXIAL_GRAPH is not None and _CACHED_AXIAL_GRAPH.key == key:
+		if progress is not None:
+			progress.setStatus("Reusing prepared graph")
+			progress.setProgress(1)
+		return (_CACHED_AXIAL_GRAPH.graph_handle, _CACHED_AXIAL_GRAPH.line_rows, _CACHED_AXIAL_GRAPH.point_rows)
+
+	if _CACHED_AXIAL_GRAPH is not None:
+		_CACHED_AXIAL_GRAPH.free()
+
+	(graph, line_rows, point_rows) = BuildAxialGraph(
+		model,
+		pstalgo,
+		stack_allocator,
+		network_table,
+		unlink_table,
+		point_table,
+		progress,
+		poly_edge_point_interval=poly_edge_point_interval)
+	_CACHED_AXIAL_GRAPH = _CachedAxialGraph(key, graph, line_rows, point_rows, pstalgo.FreeGraph)
+	return (graph, _CACHED_AXIAL_GRAPH.line_rows, _CACHED_AXIAL_GRAPH.point_rows)
 
 def BuildSegmentGraph(model, pstalgo, stack_allocator, network_table, progress):
 	initial_alloc_state = stack_allocator.state()
