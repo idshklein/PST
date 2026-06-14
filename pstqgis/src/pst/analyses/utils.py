@@ -397,9 +397,17 @@ def RadiusValuesFromSetting(value, integer=False):
 	converted = []
 	for raw_value in values:
 		if integer:
-			converted_value = int(round(float(raw_value)))
+			num = float(raw_value)
+			if not math.isfinite(num):
+				raise ValueError("Radius must be a finite number")
+			converted_value = int(round(num))
 		else:
-			converted_value = float(raw_value)
+			num = float(raw_value)
+			if not math.isfinite(num):
+				raise ValueError("Radius must be a finite number")
+			converted_value = num
+		if converted_value < 0:
+			raise ValueError("Radius must be non-negative")
 		if converted_value != 0:
 			converted.append(converted_value)
 	return converted
