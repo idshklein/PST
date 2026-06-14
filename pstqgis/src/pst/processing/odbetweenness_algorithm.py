@@ -30,11 +30,11 @@ from qgis.core import (QgsProcessing,
 					   QgsProcessingParameterField,
 					   QgsProcessingParameterEnum,
 					   QgsProcessingParameterString,
-					   QgsProcessingParameterNumber,
 					   QgsProcessingOutputString,
 					   QgsField)
 
 from ..analyses import ODBetweennessAnalysis, AnalysisDelegateFilter
+from ..analyses.utils import RadiusValuesFromSetting
 from .processing_qgis_model import ProcessingQgisModel
 from .processing_analysis_delegate import ProcessingAnalysisDelegate
 
@@ -173,25 +173,25 @@ class ODBetweennessAlgorithm(QgsProcessingAlgorithm):
 		)
 
 		self.addParameter(
-			QgsProcessingParameterNumber(
+			QgsProcessingParameterString(
 				self.STRAIGHT_LINE_RADIUS,
-				self.tr('Straight line radius'),
+				self.tr('Straight line radius (comma-separated or expression)'),
 				optional = True
 			)
 		)
 
 		self.addParameter(
-			QgsProcessingParameterNumber(
+			QgsProcessingParameterString(
 				self.WALKING_RADIUS,
-				self.tr('Walking radius'),
+				self.tr('Walking radius (comma-separated or expression)'),
 				optional = True
 			)
 		)
 
 		self.addParameter(
-			QgsProcessingParameterNumber(
+			QgsProcessingParameterString(
 				self.ANGULAR_RADIUS,
-				self.tr('Angular radius'),
+				self.tr('Angular radius (comma-separated or expression)'),
 				optional = True
 			)
 		)
@@ -207,7 +207,19 @@ class ODBetweennessAlgorithm(QgsProcessingAlgorithm):
 	def checkParameterValues(self, parameters, context):
 		props = self._collectProperties(parameters, context)
 
-		if not props["rad_angular_enabled"] and not props["rad_straight_enabled"] and not props["rad_walking_enabled"]:
+		try:
+			radius_values = [
+				RadiusValuesFromSetting(props[name], integer=integer)
+				for name, integer in [
+					("rad_angular", False),
+					("rad_straight", False),
+					("rad_walking", False),
+				]
+			]
+		except Exception as e:
+			return (False, str(e))
+
+		if not any(radius_values):
 			return (False, "No radius specified")
 
 		return (True, None)
@@ -246,11 +258,11 @@ class ODBetweennessAlgorithm(QgsProcessingAlgorithm):
 		props["in_unlinks"] = self.UNLINKS
 		props["in_unlinks_enabled"] = (self.parameterAsVectorLayer(parameters, self.UNLINKS, context) != None)
 		
-		props["rad_angular"] = self.parameterAsInt(parameters, self.ANGULAR_RADIUS, context)
+		props["rad_angular"] = self.parameterAsString(parameters, self.ANGULAR_RADIUS, context)
 		props["rad_angular_enabled"] = True if props["rad_angular"] else False
-		props["rad_straight"] = self.parameterAsInt(parameters, self.STRAIGHT_LINE_RADIUS, context)
+		props["rad_straight"] = self.parameterAsString(parameters, self.STRAIGHT_LINE_RADIUS, context)
 		props["rad_straight_enabled"] = True if props["rad_straight"] else False
-		props["rad_walking"] = self.parameterAsInt(parameters, self.WALKING_RADIUS, context)
+		props["rad_walking"] = self.parameterAsString(parameters, self.WALKING_RADIUS, context)
 		props["rad_walking_enabled"] = True if props["rad_walking"] else False
 
 		props["route_choice"] = self._ROUTE_CHOICE_MODES[self.parameterAsEnum(parameters, self.ROUTE_CHOICE, context)][1]

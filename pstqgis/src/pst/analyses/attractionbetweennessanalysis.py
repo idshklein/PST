@@ -24,7 +24,7 @@ import ctypes
 from .base import BaseAnalysis
 from .columnnaming import ColName, GenColName
 from .memory import stack_allocator
-from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraph, DistanceTypesFromSettings, RadiiFromSettings, MeanDepthGen
+from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraph, DistanceTypesFromSettings, RadiiListFromSettings, MeanDepthGen
 from .attractiondistanceanalysis import AttractionValueGen, GenerateAttractionDataName, ReadAttractionPoints
 
 
@@ -41,7 +41,7 @@ class AttractionBetweennessAnalysis(BaseAnalysis):
 		props = self._props
 		model = self._model
 
-		radii_list = RadiiFromSettings(pstalgo, self._props).split()
+		radii_list = RadiiListFromSettings(pstalgo, self._props)
 
 		# Distance modes
 		distance_modes = DistanceTypesFromSettings(pstalgo, props)

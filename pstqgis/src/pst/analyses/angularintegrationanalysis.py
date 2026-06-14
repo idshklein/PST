@@ -24,7 +24,7 @@ import ctypes
 from .base import BaseAnalysis
 from .columnnaming import ColName, GenColName
 from .memory import stack_allocator
-from .utils import MultiTaskProgressDelegate, BuildSegmentGraph, RadiiFromSettings, MeanDepthGen
+from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildSegmentGraph, RadiiListFromSettings, MeanDepthGen
 
 class AngularIntegrationAnalysis(BaseAnalysis):
 
@@ -78,95 +78,103 @@ class AngularIntegrationAnalysis(BaseAnalysis):
 			total_depths = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
 
 			# Radius
-			radii = RadiiFromSettings(pstalgo, self._props)
+			radii_list = RadiiListFromSettings(pstalgo, self._props)
 
-			columns = []
+			radii_progress = TaskSplitProgressDelegate(len(radii_list), "Performing analysis", progress)
+			for radii in radii_list:
+				radii_sub_progress = MultiTaskProgressDelegate(radii_progress)
+				if need_length_weight_analysis:
+					radii_sub_progress.addTask(Tasks.LENGTH_WEIGHT_ANALYSIS, 5, "Calculating length-weighted angular integration")
+				if need_no_weight_analysis:
+					radii_sub_progress.addTask(Tasks.NO_WEIGHT_ANALYSIS, 5, "Calculating angular integration")
+				radii_sub_progress.addTask(Tasks.WRITE_RESULTS, 1, "Writing results")
+				N_TD_MD_outputted = False
+				columns = []
 
-			N_TD_MD_outputted = False
+				# Length-weighted analysis
+				if need_length_weight_analysis:
+					radii_sub_progress.setCurrentTask(Tasks.LENGTH_WEIGHT_ANALYSIS)
+					total_weights = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
+					total_depth_weights = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
+					pstalgo.AngularIntegration(
+						graph_handle = graph,
+						radius = radii,
+						weigh_by_length = True,
+						angle_threshold = props['angle_threshold'],
+						angle_precision = props['angle_precision'],
+						progress_callback = pstalgo.CreateAnalysisDelegateCallbackWrapper(radii_sub_progress),
+						out_node_counts = total_counts,
+						out_total_depths = total_depths,
+						out_total_weights = total_weights,
+						out_total_depth_weights = total_depth_weights)
+					if props['norm_normalization']:
+						scores_weighted = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
+						pstalgo.AngularIntegrationNormalizeLengthWeight(total_weights, total_depth_weights, line_count, scores_weighted)
+						columns.append((ScoreColName(radii, ColName.WEIGHT_LENGTH, ColName.NORM_NONE), 'float', scores_weighted.values()))
+					if props['norm_syntax']:
+						scores_weighted = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
+						pstalgo.AngularIntegrationSyntaxNormalizeLengthWeight(total_weights, total_depth_weights, line_count, scores_weighted)
+						columns.append((ScoreColName(radii, ColName.WEIGHT_LENGTH, ColName.NORM_SYNTAX_NAIN), 'float', scores_weighted.values()))
+					if props['norm_hillier']:
+						scores_weighted = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
+						pstalgo.AngularIntegrationHillierNormalizeLengthWeight(total_weights, total_depth_weights, line_count, scores_weighted)
+						columns.append((ScoreColName(radii, ColName.WEIGHT_LENGTH, ColName.NORM_HILLIER), 'float', scores_weighted.values()))
+					if not N_TD_MD_outputted:
+						if props['output_N']:
+							columns.append((ExtraColName(radii, ColName.EXTRA_NODE_COUNT), 'integer', total_counts.values()))
+						if props['output_TD']:
+							columns.append((ExtraColName(radii, ColName.EXTRA_TOTAL_DEPTH), 'float', total_depths.values()))
+						if props['output_MD']:
+							columns.append((ExtraColName(radii, ColName.EXTRA_MEAN_DEPTH), 'float', MeanDepthGen(total_depths, total_counts)))
+						N_TD_MD_outputted = True
 
-			# Length-weighted analysis
-			if need_length_weight_analysis:
-				progress.setCurrentTask(Tasks.LENGTH_WEIGHT_ANALYSIS)
-				total_weights = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
-				total_depth_weights = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
-				pstalgo.AngularIntegration(
-					graph_handle = graph,
-					radius = radii,
-					weigh_by_length = True,
-					angle_threshold = props['angle_threshold'],
-					angle_precision = props['angle_precision'],
-					progress_callback = pstalgo.CreateAnalysisDelegateCallbackWrapper(progress),
-					out_node_counts = total_counts,
-					out_total_depths = total_depths,
-					out_total_weights = total_weights,
-					out_total_depth_weights = total_depth_weights)
-				if props['norm_normalization']:
-					scores_weighted = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
-					pstalgo.AngularIntegrationNormalizeLengthWeight(total_weights, total_depth_weights, line_count, scores_weighted)
-					columns.append((ScoreColName(radii, ColName.WEIGHT_LENGTH, ColName.NORM_NONE), 'float', scores_weighted.values()))
-				if props['norm_syntax']:
-					scores_weighted = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
-					pstalgo.AngularIntegrationSyntaxNormalizeLengthWeight(total_weights, total_depth_weights, line_count, scores_weighted)
-					columns.append((ScoreColName(radii, ColName.WEIGHT_LENGTH, ColName.NORM_SYNTAX_NAIN), 'float', scores_weighted.values()))
-				if props['norm_hillier']:
-					scores_weighted = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
-					pstalgo.AngularIntegrationHillierNormalizeLengthWeight(total_weights, total_depth_weights, line_count, scores_weighted)
-					columns.append((ScoreColName(radii, ColName.WEIGHT_LENGTH, ColName.NORM_HILLIER), 'float', scores_weighted.values()))
-				if not N_TD_MD_outputted:
-					if props['output_N']:
-						columns.append((ExtraColName(radii, ColName.EXTRA_NODE_COUNT), 'integer', total_counts.values()))
-					if props['output_TD']:
-						columns.append((ExtraColName(radii, ColName.EXTRA_TOTAL_DEPTH), 'float', total_depths.values()))
-					if props['output_MD']:
-						columns.append((ExtraColName(radii, ColName.EXTRA_MEAN_DEPTH), 'float', MeanDepthGen(total_depths, total_counts)))
-					N_TD_MD_outputted = True
+				# Non-weighted analysis
+				if need_no_weight_analysis:
+					radii_sub_progress.setCurrentTask(Tasks.NO_WEIGHT_ANALYSIS)
+					pstalgo.AngularIntegration(
+						graph_handle = graph,
+						radius = radii,
+						weigh_by_length = False,
+						angle_threshold = props['angle_threshold'],
+						angle_precision = props['angle_precision'],
+						progress_callback = pstalgo.CreateAnalysisDelegateCallbackWrapper(radii_sub_progress),
+						out_node_counts = total_counts,
+						out_total_depths = total_depths,
+						out_total_weights = None,
+						out_total_depth_weights = None)
+					if props['norm_normalization']:
+						scores = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
+						pstalgo.AngularIntegrationNormalize(total_counts, total_depths, line_count, scores)
+						columns.append((ScoreColName(radii, ColName.WEIGHT_NONE, ColName.NORM_NONE), 'float', scores.values()))
+					if props['norm_syntax']:
+						scores = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
+						pstalgo.AngularIntegrationSyntaxNormalize(total_counts, total_depths, line_count, scores)
+						columns.append((ScoreColName(radii, ColName.WEIGHT_NONE, ColName.NORM_SYNTAX_NAIN), 'float', scores.values()))
+					if props['norm_hillier']:
+						scores = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
+						pstalgo.AngularIntegrationHillierNormalize(total_counts, total_depths, line_count, scores)
+						columns.append((ScoreColName(radii, ColName.WEIGHT_NONE, ColName.NORM_HILLIER), 'float', scores.values()))
+					if not N_TD_MD_outputted:
+						if props['output_N']:
+							columns.append((ExtraColName(radii, ColName.EXTRA_NODE_COUNT), 'integer', total_counts.values()))
+						if props['output_TD']:
+							columns.append((ExtraColName(radii, ColName.EXTRA_TOTAL_DEPTH), 'float', total_depths.values()))
+						if props['output_MD']:
+							columns.append((ExtraColName(radii, ColName.EXTRA_MEAN_DEPTH), 'float', MeanDepthGen(total_depths, total_counts)))
+						N_TD_MD_outputted = True
 
-			# Non-weighted analysis
-			if need_no_weight_analysis:
-				progress.setCurrentTask(Tasks.NO_WEIGHT_ANALYSIS)
-				pstalgo.AngularIntegration(
-					graph_handle = graph,
-					radius = radii,
-					weigh_by_length = False,
-					angle_threshold = props['angle_threshold'],
-					angle_precision = props['angle_precision'],
-					progress_callback = pstalgo.CreateAnalysisDelegateCallbackWrapper(progress),
-					out_node_counts = total_counts,
-					out_total_depths = total_depths,
-					out_total_weights = None,
-					out_total_depth_weights = None)
-				if props['norm_normalization']:
-					scores = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
-					pstalgo.AngularIntegrationNormalize(total_counts, total_depths, line_count, scores)
-					columns.append((ScoreColName(radii, ColName.WEIGHT_NONE, ColName.NORM_NONE), 'float', scores.values()))
-				if props['norm_syntax']:
-					scores = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
-					pstalgo.AngularIntegrationSyntaxNormalize(total_counts, total_depths, line_count, scores)
-					columns.append((ScoreColName(radii, ColName.WEIGHT_NONE, ColName.NORM_SYNTAX_NAIN), 'float', scores.values()))
-				if props['norm_hillier']:
-					scores = Vector(ctypes.c_float, line_count, stack_allocator, line_count)
-					pstalgo.AngularIntegrationHillierNormalize(total_counts, total_depths, line_count, scores)
-					columns.append((ScoreColName(radii, ColName.WEIGHT_NONE, ColName.NORM_HILLIER), 'float', scores.values()))
-				if not N_TD_MD_outputted:
-					if props['output_N']:
-						columns.append((ExtraColName(radii, ColName.EXTRA_NODE_COUNT), 'integer', total_counts.values()))
-					if props['output_TD']:
-						columns.append((ExtraColName(radii, ColName.EXTRA_TOTAL_DEPTH), 'float', total_depths.values()))
-					if props['output_MD']:
-						columns.append((ExtraColName(radii, ColName.EXTRA_MEAN_DEPTH), 'float', MeanDepthGen(total_depths, total_counts)))
-					N_TD_MD_outputted = True
+				# Write results for this radius
+				radii_sub_progress.setCurrentTask(Tasks.WRITE_RESULTS)
+				self._model.writeColumns(
+					self._props['in_network'],
+					line_rows,
+					columns,
+					radii_sub_progress)
+				radii_progress.nextTask()
 
 			# Free graph
 			pstalgo.FreeSegmentGraph(graph)
 			graph = None
-
-			# --- WRITE_RESULTS ---
-			progress.setCurrentTask(Tasks.WRITE_RESULTS)
-			self._model.writeColumns(
-				self._props['in_network'],
-				line_rows,
-				columns,
-				progress)
 
 		finally:
 			stack_allocator.restore(initial_alloc_state)

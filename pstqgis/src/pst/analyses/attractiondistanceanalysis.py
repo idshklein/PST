@@ -27,7 +27,7 @@ from ..model import GeometryType
 from .base import BaseAnalysis
 from .columnnaming import ColName, GenColName
 from .memory import stack_allocator
-from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraph, DistanceTypesFromSettings, RadiiFromSettings, PointGen
+from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraph, DistanceTypesFromSettings, RadiiListFromSettings, PointGen
 
 
 class AttractionDistanceAnalysis(BaseAnalysis):
@@ -44,7 +44,7 @@ class AttractionDistanceAnalysis(BaseAnalysis):
 		model = self._model
 
 		# Radius
-		radii = RadiiFromSettings(pstalgo, self._props)
+		radii_list = RadiiListFromSettings(pstalgo, self._props)
 
 		# Origin type
 		origin_type = OriginTypeFromProps(pstalgo, props)
@@ -60,7 +60,7 @@ class AttractionDistanceAnalysis(BaseAnalysis):
 		dst_attr_to_org_in_column = props['dst_attr_to_org_in_column']
 
 		# Number of analyses
-		analysis_count = len(attraction_columns) * len(distance_types)
+		analysis_count = len(attraction_columns) * len(distance_types) * len(radii_list)
 
 		def GenerateColumnName(dest_name, distance_type, radii):
 			return GenColName(ColName.ATTRACTION_DISTANCE, weight=dest_name, pst_distance_type=distance_type, radii=radii)
@@ -152,45 +152,46 @@ class AttractionDistanceAnalysis(BaseAnalysis):
 					attr_points_filtered = attr_points_temp
 					attr_points_per_polygon_filtered = attr_points_per_polygon_temp
 				# Distance types
-				for distance_type in distance_types:
-					# Allocate output arrays
-					scores = Vector(ctypes.c_float, output_count, stack_allocator, output_count)
-					destination_indices = Vector(ctypes.c_int, output_count, stack_allocator, output_count) if dst_attr_to_org_enabled else None
-					# Analysis - select correct parameters for each distance type
-					if distance_type == pstalgo.DistanceType.WEIGHTS:
-						line_weights = line_weights_for_weights_mode
-						point_connection_weight = point_connection_weight_value
-					else:
-						line_weights = None
-						point_connection_weight = 0
-					pstalgo.AttractionDistance(
-							graph_handle = graph,
-							origin_type = origin_type,
-							distance_type = distance_type,
-							radius = radii,
-							attraction_points = attr_points_filtered,
-							points_per_polygon = attr_points_per_polygon_filtered,
-							polygon_point_interval = props['dest_poly_edge_point_interval'],
-							line_weights=line_weights,
-							weight_per_meter_for_point_edges=point_connection_weight,
-							progress_callback = pstalgo.CreateAnalysisDelegateCallbackWrapper(analysis_progress),
-							out_min_distances = scores,
-							out_destination_indices = destination_indices)
-					# Output columns
-					attr_title = GenerateAttractionDataName(props['in_destinations'], attr_col, props['dest_name'])
-					out_dist_column_name = GenerateColumnName(attr_title, distance_type, radii)
-					columns.append((out_dist_column_name, 'float', scores.values()))
-					if dst_attr_to_org_enabled:
-						assert(destination_indices and destination_attributes_filtered)
-						def AttributeGen(indices, attributes):
-							for i in range(indices.size()):
-								dst_idx = indices[i]
-								yield None if dst_idx < 0 else attributes[dst_idx]
-						out_attrib_column_name = "%s_%s" % (out_dist_column_name, props['dst_attr_to_org_out_column_suffix'])
-						attrib_data_type = model.columnType(attr_table, dst_attr_to_org_in_column)
-						columns.append((out_attrib_column_name, attrib_data_type, AttributeGen(destination_indices, destination_attributes_filtered)))
-					# Progress
-					analysis_progress.nextTask()
+				for radii in radii_list:
+					for distance_type in distance_types:
+						# Allocate output arrays
+						scores = Vector(ctypes.c_float, output_count, stack_allocator, output_count)
+						destination_indices = Vector(ctypes.c_int, output_count, stack_allocator, output_count) if dst_attr_to_org_enabled else None
+						# Analysis - select correct parameters for each distance type
+						if distance_type == pstalgo.DistanceType.WEIGHTS:
+							line_weights = line_weights_for_weights_mode
+							point_connection_weight = point_connection_weight_value
+						else:
+							line_weights = None
+							point_connection_weight = 0
+						pstalgo.AttractionDistance(
+								graph_handle = graph,
+								origin_type = origin_type,
+								distance_type = distance_type,
+								radius = radii,
+								attraction_points = attr_points_filtered,
+								points_per_polygon = attr_points_per_polygon_filtered,
+								polygon_point_interval = props['dest_poly_edge_point_interval'],
+								line_weights=line_weights,
+								weight_per_meter_for_point_edges=point_connection_weight,
+								progress_callback = pstalgo.CreateAnalysisDelegateCallbackWrapper(analysis_progress),
+								out_min_distances = scores,
+								out_destination_indices = destination_indices)
+						# Output columns
+						attr_title = GenerateAttractionDataName(props['in_destinations'], attr_col, props['dest_name'])
+						out_dist_column_name = GenerateColumnName(attr_title, distance_type, radii)
+						columns.append((out_dist_column_name, 'float', scores.values()))
+						if dst_attr_to_org_enabled:
+							assert(destination_indices and destination_attributes_filtered)
+							def AttributeGen(indices, attributes):
+								for i in range(indices.size()):
+									dst_idx = indices[i]
+									yield None if dst_idx < 0 else attributes[dst_idx]
+							out_attrib_column_name = "%s_%s" % (out_dist_column_name, props['dst_attr_to_org_out_column_suffix'])
+							attrib_data_type = model.columnType(attr_table, dst_attr_to_org_in_column)
+							columns.append((out_attrib_column_name, attrib_data_type, AttributeGen(destination_indices, destination_attributes_filtered)))
+						# Progress
+						analysis_progress.nextTask()
 
 			# Write
 			progress.setCurrentTask(Tasks.WRITE_RESULTS)

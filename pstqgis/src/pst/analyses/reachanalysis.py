@@ -25,7 +25,7 @@ import ctypes
 from .base import BaseAnalysis
 from .columnnaming import ColName, GenColName
 from .memory import stack_allocator
-from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraph, RadiiFromSettings
+from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraph, RadiiListFromSettings
 
 class ReachAnalysis(BaseAnalysis):
 
@@ -41,7 +41,7 @@ class ReachAnalysis(BaseAnalysis):
 
 		origins_enabled = self._props['in_origins_enabled']
 
-		radii_list = RadiiFromSettings(pstalgo, self._props).split()
+		radii_list = RadiiListFromSettings(pstalgo, self._props)
 
 		analysis_count = len(radii_list)
 

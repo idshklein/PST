@@ -21,7 +21,7 @@ along with PST. If not, see <http://www.gnu.org/licenses/>.
 
 from qgis.PyQt.QtWidgets import QLabel, QComboBox, QLineEdit, QMessageBox, QVBoxLayout
 from ..wizard import BaseWiz, BasePage, WizProp, WizPropCombo
-from ..pages import FinishPage, ProgressPage, ReadyPage, AddRadiusProperties, RadiusType
+from ..pages import FinishPage, ProgressPage, ReadyPage, AddRadiusProperties, RadiusType, ValidateRadiusProperties
 from ..widgets import PropertySheetWidget, WidgetEnableCheckBox
 
 class ODBetweennessWiz(BaseWiz):
@@ -176,6 +176,8 @@ class DistanceSettingsPage(BasePage):
 		self.setLayout(vlayout)
 
 	def validatePage(self):
+		if not ValidateRadiusProperties(self, RADIUS_TYPES):
+			return False
 		p = self.wizard().prop
 		if p("column_suffix_enabled"):
 			column_suffix = p("column_suffix")

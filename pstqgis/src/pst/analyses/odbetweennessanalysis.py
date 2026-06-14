@@ -24,7 +24,7 @@ import ctypes
 from .base import BaseAnalysis
 from .columnnaming import ColName, GenColName
 from .memory import stack_allocator
-from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraph, RadiiFromSettings
+from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraph, RadiiListFromSettings
 from .attractiondistanceanalysis import AttractionValueGen
 
 class ODBetweennessAnalysis(BaseAnalysis):
@@ -54,7 +54,7 @@ class ODBetweennessAnalysis(BaseAnalysis):
 		}[props["route_choice"]]
 
 		# Radii
-		radii_list = RadiiFromSettings(pstalgo, props).split()  # Only applicable in non-weight mode
+		radii_list = RadiiListFromSettings(pstalgo, props)  # Only applicable in non-weight mode
 
 		column_suffix =  props['column_suffix'] if props['column_suffix_enabled'] else None
 

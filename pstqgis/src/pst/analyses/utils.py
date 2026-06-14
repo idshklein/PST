@@ -21,10 +21,65 @@ along with PST. If not, see <http://www.gnu.org/licenses/>.
 
 from builtins import range
 from builtins import object
+import ast
+import atexit
 import ctypes
+import math
+import operator
 from .base import AnalysisException
 from qgis.core import QgsMessageLog, QgsRectangle, QgsProject, QgsProcessingUtils, QgsRasterDataProvider, QgsRasterLayer, QgsRasterShader, QgsColorRampShader, QgsSingleBandPseudoColorRenderer
 from osgeo import gdal
+
+class RowIdBuffer(object):
+	def __init__(self, row_ids):
+		if row_ids is None:
+			self._row_ids = ()
+		elif hasattr(row_ids, 'values'):
+			self._row_ids = tuple(row_ids.values())
+		else:
+			self._row_ids = tuple(row_ids)
+
+	def size(self):
+		return len(self._row_ids)
+
+	def at(self, index):
+		return self._row_ids[index]
+
+	def values(self):
+		return iter(self._row_ids)
+
+	def __len__(self):
+		return len(self._row_ids)
+
+	def __getitem__(self, index):
+		return self._row_ids[index]
+
+
+class _CachedAxialGraph(object):
+	def __init__(self, key, graph_handle, line_rows, point_rows, free_graph):
+		self.key = key
+		self.graph_handle = graph_handle
+		self.line_rows = RowIdBuffer(line_rows)
+		self.point_rows = RowIdBuffer(point_rows) if point_rows is not None else None
+		self._free_graph = free_graph
+
+	def free(self):
+		if self.graph_handle:
+			self._free_graph(self.graph_handle)
+			self.graph_handle = None
+
+
+_CACHED_AXIAL_GRAPH = None
+
+
+def _clear_cached_axial_graph():
+	global _CACHED_AXIAL_GRAPH
+	if _CACHED_AXIAL_GRAPH is not None:
+		_CACHED_AXIAL_GRAPH.free()
+		_CACHED_AXIAL_GRAPH = None
+
+
+atexit.register(_clear_cached_axial_graph)
 
 class MultiTaskProgressDelegate(object):
 	def __init__(self, delegate):
@@ -183,6 +238,58 @@ def BuildAxialGraph(model, pstalgo, stack_allocator, network_table, unlink_table
 
 	return (graph, line_rows, point_rows)
 
+def _graph_cache_key(model, network_table, unlink_table, point_table, poly_edge_point_interval):
+	def layer_key(table_name):
+		if table_name is None:
+			return None
+		layer = model._layerFromName(table_name)
+		if layer.isEditable():
+			return None  # sentinel: layer is editable
+		return (layer.id(), layer.source(), layer.featureCount())
+
+	keys = [
+		layer_key(network_table),
+		layer_key(unlink_table),
+		layer_key(point_table),
+	]
+
+	# If any specified layer is editable, bypass cache entirely
+	tables = [network_table, unlink_table, point_table]
+	if any(k is None and t is not None for k, t in zip(keys, tables)):
+		return None
+
+	return (keys[0], keys[1], keys[2], poly_edge_point_interval)
+
+def BuildAxialGraphCached(model, pstalgo, stack_allocator, network_table, unlink_table, point_table, progress, poly_edge_point_interval=0):
+	global _CACHED_AXIAL_GRAPH
+
+	key = _graph_cache_key(model, network_table, unlink_table, point_table, poly_edge_point_interval)
+	if key is not None and _CACHED_AXIAL_GRAPH is not None and _CACHED_AXIAL_GRAPH.key == key:
+		if progress is not None:
+			progress.setStatus("Reusing prepared graph")
+			progress.setProgress(1)
+		return (_CACHED_AXIAL_GRAPH.graph_handle, _CACHED_AXIAL_GRAPH.line_rows, _CACHED_AXIAL_GRAPH.point_rows)
+
+	if _CACHED_AXIAL_GRAPH is not None:
+		_CACHED_AXIAL_GRAPH.free()
+		_CACHED_AXIAL_GRAPH = None
+
+	(graph, line_rows, point_rows) = BuildAxialGraph(
+		model,
+		pstalgo,
+		stack_allocator,
+		network_table,
+		unlink_table,
+		point_table,
+		progress,
+		poly_edge_point_interval=poly_edge_point_interval)
+
+	if key is not None:
+		_CACHED_AXIAL_GRAPH = _CachedAxialGraph(key, graph, line_rows, point_rows, pstalgo.FreeGraph)
+		return (graph, _CACHED_AXIAL_GRAPH.line_rows, _CACHED_AXIAL_GRAPH.point_rows)
+	else:
+		return (graph, RowIdBuffer(line_rows), RowIdBuffer(point_rows) if point_rows is not None else None)
+
 def BuildSegmentGraph(model, pstalgo, stack_allocator, network_table, progress):
 	initial_alloc_state = stack_allocator.state()
 	final_alloc_state = initial_alloc_state
@@ -215,13 +322,146 @@ def BuildSegmentGraph(model, pstalgo, stack_allocator, network_table, progress):
 	stack_allocator.restore(final_alloc_state)
 	return (graph, line_rows)
 
+_RADIUS_EXPR_FUNCS = {
+	'abs': abs,
+	'ceil': math.ceil,
+	'floor': math.floor,
+	'max': max,
+	'min': min,
+	'pow': pow,
+	'range': range,
+	'round': round,
+	'sqrt': math.sqrt,
+}
+
+_RADIUS_EXPR_NAMES = {
+	'e': math.e,
+	'pi': math.pi,
+	'tau': getattr(math, 'tau', 2 * math.pi),
+}
+
+_RADIUS_EXPR_BINOPS = {
+	ast.Add: operator.add,
+	ast.Sub: operator.sub,
+	ast.Mult: operator.mul,
+	ast.Div: operator.truediv,
+	ast.FloorDiv: operator.floordiv,
+	ast.Mod: operator.mod,
+	ast.Pow: operator.pow,
+}
+
+_RADIUS_EXPR_UNARYOPS = {
+	ast.UAdd: operator.pos,
+	ast.USub: operator.neg,
+}
+
+def _EvaluateRadiusExpression(node):
+	if isinstance(node, ast.Constant):
+		if isinstance(node.value, (int, float)):
+			return node.value
+		raise ValueError("Unsupported literal in radius expression")
+	if isinstance(node, ast.Num):  # pragma: no cover - Python < 3.8
+		return node.n
+	if isinstance(node, ast.List):
+		return [_EvaluateRadiusExpression(elt) for elt in node.elts]
+	if isinstance(node, ast.Tuple):
+		return tuple(_EvaluateRadiusExpression(elt) for elt in node.elts)
+	if isinstance(node, ast.Set):
+		return [_EvaluateRadiusExpression(elt) for elt in node.elts]
+	if isinstance(node, ast.BinOp):
+		op = _RADIUS_EXPR_BINOPS.get(type(node.op))
+		if op is None:
+			raise ValueError("Unsupported operator in radius expression")
+		return op(_EvaluateRadiusExpression(node.left), _EvaluateRadiusExpression(node.right))
+	if isinstance(node, ast.UnaryOp):
+		op = _RADIUS_EXPR_UNARYOPS.get(type(node.op))
+		if op is None:
+			raise ValueError("Unsupported unary operator in radius expression")
+		return op(_EvaluateRadiusExpression(node.operand))
+	if isinstance(node, ast.Name):
+		if node.id not in _RADIUS_EXPR_NAMES:
+			raise ValueError("Unsupported name in radius expression")
+		return _RADIUS_EXPR_NAMES[node.id]
+	if isinstance(node, ast.Call):
+		if not isinstance(node.func, ast.Name) or node.func.id not in _RADIUS_EXPR_FUNCS:
+			raise ValueError("Unsupported function in radius expression")
+		if node.keywords:
+			raise ValueError("Keyword arguments are not supported in radius expressions")
+		func = _RADIUS_EXPR_FUNCS[node.func.id]
+		args = [_EvaluateRadiusExpression(arg) for arg in node.args]
+		return func(*args)
+	raise ValueError("Unsupported syntax in radius expression")
+
+def RadiusValuesFromSetting(value, integer=False):
+	if value is None:
+		return []
+	if isinstance(value, (int, float)):
+		values = [value]
+	else:
+		expression = str(value).strip()
+		if not expression:
+			return []
+		parsed = ast.parse(expression, mode='eval')
+		values = _EvaluateRadiusExpression(parsed.body)
+		if isinstance(values, range):
+			if len(values) > 10000:
+				raise ValueError("Too many radius values in range()")
+		elif not isinstance(values, (list, tuple)):
+			values = [values]
+	converted = []
+	for raw_value in values:
+		if integer:
+			num = float(raw_value)
+
+			if not math.isfinite(num):
+
+				raise ValueError("Radius must be a finite number")
+
+			converted_value = int(round(num))
+
+		else:
+			num = float(raw_value)
+
+			if not math.isfinite(num):
+
+				raise ValueError("Radius must be a finite number")
+
+			converted_value = num
+
+		if converted_value < 0:
+
+			raise ValueError("Radius must be non-negative")
+
+		if converted_value != 0:
+			converted.append(converted_value)
+	return converted
+
+def RadiiListFromSettings(pstalgo, settings):
+	value_specs = [
+		('rad_straight', 'straight', False),
+		('rad_walking', 'walking', False),
+		('rad_steps', 'steps', True),
+		('rad_angular', 'angular', False),
+		('rad_axmeter', 'axmeter', False),
+	]
+	radii_value_sets = []
+	for setting_name, radii_name, integer in value_specs:
+		if not settings.get(setting_name + '_enabled'):
+			continue
+		radii_values = RadiusValuesFromSetting(settings.get(setting_name), integer=integer)
+		if not radii_values:
+			raise ValueError("Please specify at least one radius value.")
+		for value in radii_values:
+			radii_value_sets.append(pstalgo.Radii(**{radii_name: value}))
+	if not radii_value_sets:
+		return []
+	return radii_value_sets
+
 def RadiiFromSettings(pstalgo, settings):
-	return pstalgo.Radii(
-		straight = settings['rad_straight'] if settings.get('rad_straight_enabled') else None,
-		walking =  settings['rad_walking']  if settings.get('rad_walking_enabled')  else None,
-		steps =    settings['rad_steps']    if settings.get('rad_steps_enabled')    else None,
-		angular =  settings['rad_angular']  if settings.get('rad_angular_enabled')  else None,
-		axmeter =  settings['rad_axmeter']  if settings.get('rad_axmeter_enabled')  else None)
+	radii_list = RadiiListFromSettings(pstalgo, settings)
+	if radii_list:
+		return radii_list[0]
+	return pstalgo.Radii()
 
 def DistanceTypesFromSettings(pstalgo, props):
 	distance_types = []

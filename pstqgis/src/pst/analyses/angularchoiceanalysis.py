@@ -24,7 +24,7 @@ import ctypes
 from .base import BaseAnalysis
 from .columnnaming import ColName, GenColName
 from .memory import stack_allocator
-from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildSegmentGraph, RadiiFromSettings, MeanDepthGen
+from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildSegmentGraph, RadiiListFromSettings, MeanDepthGen
 
 
 class AngularChoiceAnalysis(BaseAnalysis):
@@ -50,6 +50,8 @@ class AngularChoiceAnalysis(BaseAnalysis):
 		def GenerateStatColumnName(stat, radii):
 			return GenColName(ColName.ANGULAR_CHOICE, radii = radii, extra = stat)
 
+		radii_list = RadiiListFromSettings(pstalgo, self._props)
+
 		# Number of analyses
 		analysis_count = 0
 		if props['weight_none']:
@@ -65,9 +67,7 @@ class AngularChoiceAnalysis(BaseAnalysis):
 			WRITE_RESULTS = 3
 		progress = MultiTaskProgressDelegate(delegate)
 		progress.addTask(Tasks.BUILD_GRAPH, 1, None)
-		progress.addTask(Tasks.ANALYSIS, 5*analysis_count, None)
-
-		radii = RadiiFromSettings(pstalgo, self._props)
+		progress.addTask(Tasks.ANALYSIS, 5*analysis_count*len(radii_list), None)
 
 		initial_alloc_state = stack_allocator.state()
 
@@ -89,109 +89,110 @@ class AngularChoiceAnalysis(BaseAnalysis):
 			total_depth_weights = Vector(ctypes.c_float, line_count, stack_allocator, line_count) if props['weight_length'] else None
 
 			progress.setCurrentTask(Tasks.ANALYSIS)
-			analysis_progress = TaskSplitProgressDelegate(analysis_count, "Performing analysis", progress)
+			analysis_progress = TaskSplitProgressDelegate(analysis_count*len(radii_list), "Performing analysis", progress)
 
-			N_TD_MD_outputted = False
+			for radii in radii_list:
+				N_TD_MD_outputted = False
 
-			if props['weight_length']:
-				# Analysis sub progress
-				analysis_sub_progress = MultiTaskProgressDelegate(analysis_progress)
-				analysis_sub_progress.addTask(Tasks.ANALYSIS, 3, "Calculating")
-				analysis_sub_progress.addTask(Tasks.WRITE_RESULTS, 1, "Writing line results")
-				# Analysis
-				analysis_sub_progress.setCurrentTask(Tasks.ANALYSIS)
-				pstalgo.AngularChoice(
-					graph_handle = graph,
-					radius = radii,
-					weigh_by_length = True,
-					angle_threshold = props['angle_threshold'],
-					angle_precision = props['angle_precision'],
-					progress_callback = pstalgo.CreateAnalysisDelegateCallbackWrapper(analysis_sub_progress),
-					out_choice = scores,
-					out_node_count = total_counts,
-					out_total_depth = total_depths,
-					out_total_depth_weight = total_depth_weights)
-				# Output
-				columns = []
-				if props['norm_none']:
-					columns.append((GenerateScoreColumnName(True, radii, ColName.NORM_NONE), 'float', scores.values()))
-				# Normalization
-				if scores_norm is not None:
-					pstalgo.AngularChoiceNormalize(scores, total_counts, scores.size(), scores_norm)
-					columns.append((GenerateScoreColumnName(True, radii, ColName.NORM_TURNER), 'float', scores_norm.values()))
-				# Standard normalization
-				if scores_std is not None:
-					pstalgo.StandardNormalize(scores, scores.size(), scores_std)
-					columns.append((GenerateScoreColumnName(True, radii, ColName.NORM_STANDARD), 'float', scores_std.values()))
-				# Syntax normalization
-				if scores_syntax is not None:
-					pstalgo.AngularChoiceSyntaxNormalize(scores, total_depth_weights, scores.size(), scores_syntax)
-					columns.append((GenerateScoreColumnName(True, radii, ColName.NORM_SYNTAX_NACH), 'float', scores_syntax.values()))
-				if not N_TD_MD_outputted:
-					# N
-					if props['output_N']:
-						columns.append((GenerateStatColumnName(ColName.EXTRA_NODE_COUNT, radii), 'integer',  total_counts.values()))
-					# TD
-					if props['output_TD']:
-						columns.append((GenerateStatColumnName(ColName.EXTRA_TOTAL_DEPTH, radii), 'float', total_depths.values()))
-					# MD
-					if props['output_MD']:
-						columns.append((GenerateStatColumnName(ColName.EXTRA_MEAN_DEPTH, radii), 'float', MeanDepthGen(total_depths, total_counts)))
-					N_TD_MD_outputted = True
-				# Write
-				analysis_sub_progress.setCurrentTask(Tasks.WRITE_RESULTS)
-				self._model.writeColumns(self._props['in_network'], line_rows, columns, analysis_sub_progress)
-				# Next task progress
-				analysis_progress.nextTask()
-
-			if props['weight_none']:
-				# Analysis sub progress
-				analysis_sub_progress = MultiTaskProgressDelegate(analysis_progress)
-				analysis_sub_progress.addTask(Tasks.ANALYSIS, 3, "Calculating")
-				analysis_sub_progress.addTask(Tasks.WRITE_RESULTS, 1, "Writing line results")
-				# Analysis
-				analysis_sub_progress.setCurrentTask(Tasks.ANALYSIS)
-				pstalgo.AngularChoice(
-					graph_handle = graph,
-					radius = RadiiFromSettings(pstalgo, self._props),
-					weigh_by_length = False,
-					progress_callback = pstalgo.CreateAnalysisDelegateCallbackWrapper(analysis_sub_progress),
-					out_choice = scores,
-					out_node_count = total_counts,
-					out_total_depth = total_depths)
-				# Output
-				columns = []
-				if props['weight_none']:
+				if props['weight_length']:
+					# Analysis sub progress
+					analysis_sub_progress = MultiTaskProgressDelegate(analysis_progress)
+					analysis_sub_progress.addTask(Tasks.ANALYSIS, 3, "Calculating")
+					analysis_sub_progress.addTask(Tasks.WRITE_RESULTS, 1, "Writing line results")
+					# Analysis
+					analysis_sub_progress.setCurrentTask(Tasks.ANALYSIS)
+					pstalgo.AngularChoice(
+						graph_handle = graph,
+						radius = radii,
+						weigh_by_length = True,
+						angle_threshold = props['angle_threshold'],
+						angle_precision = props['angle_precision'],
+						progress_callback = pstalgo.CreateAnalysisDelegateCallbackWrapper(analysis_sub_progress),
+						out_choice = scores,
+						out_node_count = total_counts,
+						out_total_depth = total_depths,
+						out_total_depth_weight = total_depth_weights)
+					# Output
+					columns = []
 					if props['norm_none']:
-						columns.append((GenerateScoreColumnName(False, radii, ColName.NORM_NONE), 'float', scores.values()))
+						columns.append((GenerateScoreColumnName(True, radii, ColName.NORM_NONE), 'float', scores.values()))
 					# Normalization
 					if scores_norm is not None:
 						pstalgo.AngularChoiceNormalize(scores, total_counts, scores.size(), scores_norm)
-						columns.append((GenerateScoreColumnName(False, radii, ColName.NORM_TURNER), 'float', scores_norm.values()))
+						columns.append((GenerateScoreColumnName(True, radii, ColName.NORM_TURNER), 'float', scores_norm.values()))
 					# Standard normalization
 					if scores_std is not None:
 						pstalgo.StandardNormalize(scores, scores.size(), scores_std)
-						columns.append((GenerateScoreColumnName(False, radii, ColName.NORM_STANDARD), 'float', scores_std.values()))
+						columns.append((GenerateScoreColumnName(True, radii, ColName.NORM_STANDARD), 'float', scores_std.values()))
 					# Syntax normalization
 					if scores_syntax is not None:
-						pstalgo.AngularChoiceSyntaxNormalize(scores, total_depths, scores.size(), scores_syntax)
-						columns.append((GenerateScoreColumnName(False, radii, ColName.NORM_SYNTAX_NACH), 'float', scores_syntax.values()))
-				if not N_TD_MD_outputted:
-					# N
-					if props['output_N']:
-						columns.append((GenerateStatColumnName(ColName.EXTRA_NODE_COUNT, radii), 'integer',  total_counts.values()))
-					# TD
-					if props['output_TD']:
-						columns.append((GenerateStatColumnName(ColName.EXTRA_TOTAL_DEPTH, radii), 'float', total_depths.values()))
-					# MD
-					if props['output_MD']:
-						columns.append((GenerateStatColumnName(ColName.EXTRA_MEAN_DEPTH, radii), 'float', MeanDepthGen(total_depths, total_counts)))
-					N_TD_MD_outputted = True
-				# Write
-				analysis_sub_progress.setCurrentTask(Tasks.WRITE_RESULTS)
-				self._model.writeColumns(self._props['in_network'], line_rows, columns, analysis_sub_progress)
-				# Next task progress
-				analysis_progress.nextTask()
+						pstalgo.AngularChoiceSyntaxNormalize(scores, total_depth_weights, scores.size(), scores_syntax)
+						columns.append((GenerateScoreColumnName(True, radii, ColName.NORM_SYNTAX_NACH), 'float', scores_syntax.values()))
+					if not N_TD_MD_outputted:
+						# N
+						if props['output_N']:
+							columns.append((GenerateStatColumnName(ColName.EXTRA_NODE_COUNT, radii), 'integer',  total_counts.values()))
+						# TD
+						if props['output_TD']:
+							columns.append((GenerateStatColumnName(ColName.EXTRA_TOTAL_DEPTH, radii), 'float', total_depths.values()))
+						# MD
+						if props['output_MD']:
+							columns.append((GenerateStatColumnName(ColName.EXTRA_MEAN_DEPTH, radii), 'float', MeanDepthGen(total_depths, total_counts)))
+						N_TD_MD_outputted = True
+					# Write
+					analysis_sub_progress.setCurrentTask(Tasks.WRITE_RESULTS)
+					self._model.writeColumns(self._props['in_network'], line_rows, columns, analysis_sub_progress)
+					# Next task progress
+					analysis_progress.nextTask()
+
+				if props['weight_none']:
+					# Analysis sub progress
+					analysis_sub_progress = MultiTaskProgressDelegate(analysis_progress)
+					analysis_sub_progress.addTask(Tasks.ANALYSIS, 3, "Calculating")
+					analysis_sub_progress.addTask(Tasks.WRITE_RESULTS, 1, "Writing line results")
+					# Analysis
+					analysis_sub_progress.setCurrentTask(Tasks.ANALYSIS)
+					pstalgo.AngularChoice(
+						graph_handle = graph,
+						radius = radii,
+						weigh_by_length = False,
+						progress_callback = pstalgo.CreateAnalysisDelegateCallbackWrapper(analysis_sub_progress),
+						out_choice = scores,
+						out_node_count = total_counts,
+						out_total_depth = total_depths)
+					# Output
+					columns = []
+					if props['weight_none']:
+						if props['norm_none']:
+							columns.append((GenerateScoreColumnName(False, radii, ColName.NORM_NONE), 'float', scores.values()))
+						# Normalization
+						if scores_norm is not None:
+							pstalgo.AngularChoiceNormalize(scores, total_counts, scores.size(), scores_norm)
+							columns.append((GenerateScoreColumnName(False, radii, ColName.NORM_TURNER), 'float', scores_norm.values()))
+						# Standard normalization
+						if scores_std is not None:
+							pstalgo.StandardNormalize(scores, scores.size(), scores_std)
+							columns.append((GenerateScoreColumnName(False, radii, ColName.NORM_STANDARD), 'float', scores_std.values()))
+						# Syntax normalization
+						if scores_syntax is not None:
+							pstalgo.AngularChoiceSyntaxNormalize(scores, total_depths, scores.size(), scores_syntax)
+							columns.append((GenerateScoreColumnName(False, radii, ColName.NORM_SYNTAX_NACH), 'float', scores_syntax.values()))
+					if not N_TD_MD_outputted:
+						# N
+						if props['output_N']:
+							columns.append((GenerateStatColumnName(ColName.EXTRA_NODE_COUNT, radii), 'integer',  total_counts.values()))
+						# TD
+						if props['output_TD']:
+							columns.append((GenerateStatColumnName(ColName.EXTRA_TOTAL_DEPTH, radii), 'float', total_depths.values()))
+						# MD
+						if props['output_MD']:
+							columns.append((GenerateStatColumnName(ColName.EXTRA_MEAN_DEPTH, radii), 'float', MeanDepthGen(total_depths, total_counts)))
+						N_TD_MD_outputted = True
+					# Write
+					analysis_sub_progress.setCurrentTask(Tasks.WRITE_RESULTS)
+					self._model.writeColumns(self._props['in_network'], line_rows, columns, analysis_sub_progress)
+					# Next task progress
+					analysis_progress.nextTask()
 
 		finally:
 			stack_allocator.restore(initial_alloc_state)

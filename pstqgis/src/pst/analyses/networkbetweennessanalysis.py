@@ -25,7 +25,7 @@ import ctypes
 from .base import BaseAnalysis
 from .columnnaming import ColName, GenColName
 from .memory import stack_allocator
-from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraph, DistanceTypesFromSettings, RadiiFromSettings, MeanDepthGen
+from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraphCached, DistanceTypesFromSettings, RadiiListFromSettings, MeanDepthGen
 
 
 class NetworkBetweennessAnalysis(BaseAnalysis):
@@ -41,7 +41,7 @@ class NetworkBetweennessAnalysis(BaseAnalysis):
 		Vector = pstalgo.Vector
 		props = self._props
 
-		radii_list = RadiiFromSettings(pstalgo, self._props).split()
+		radii_list = RadiiListFromSettings(pstalgo, self._props)
 
 		# Distance modes
 		distance_modes = DistanceTypesFromSettings(pstalgo, props)
@@ -90,7 +90,7 @@ class NetworkBetweennessAnalysis(BaseAnalysis):
 		try:
 			# Graph
 			progress.setCurrentTask(Tasks.BUILD_GRAPH)
-			(graph, line_rows, _) = BuildAxialGraph(
+			(graph, line_rows, _) = BuildAxialGraphCached(
 				self._model,
 				pstalgo,
 				stack_allocator,
@@ -186,8 +186,6 @@ class NetworkBetweennessAnalysis(BaseAnalysis):
 
 		finally:
 			stack_allocator.restore(initial_alloc_state)
-			if graph:
-				pstalgo.FreeGraph(graph)
 
 		delegate.setStatus("Network Betweenness done")
 		delegate.setProgress(1)
