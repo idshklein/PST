@@ -391,23 +391,34 @@ def RadiusValuesFromSetting(value, integer=False):
 		parsed = ast.parse(expression, mode='eval')
 		values = _EvaluateRadiusExpression(parsed.body)
 		if isinstance(values, range):
-			values = list(values)
+			if len(values) > 10000:
+				raise ValueError("Too many radius values in range()")
 		elif not isinstance(values, (list, tuple)):
 			values = [values]
 	converted = []
 	for raw_value in values:
 		if integer:
-			num = float(raw_value)
-			if not math.isfinite(num):
-				raise ValueError("Radius must be a finite number")
-			converted_value = int(round(num))
+			num = float(raw_value)
+
+			if not math.isfinite(num):
+
+				raise ValueError("Radius must be a finite number")
+
+			converted_value = int(round(num))
+
 		else:
-			num = float(raw_value)
-			if not math.isfinite(num):
-				raise ValueError("Radius must be a finite number")
-			converted_value = num
-		if converted_value < 0:
-			raise ValueError("Radius must be non-negative")
+			num = float(raw_value)
+
+			if not math.isfinite(num):
+
+				raise ValueError("Radius must be a finite number")
+
+			converted_value = num
+
+		if converted_value < 0:
+
+			raise ValueError("Radius must be non-negative")
+
 		if converted_value != 0:
 			converted.append(converted_value)
 	return converted
