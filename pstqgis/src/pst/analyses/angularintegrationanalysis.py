@@ -80,8 +80,6 @@ class AngularIntegrationAnalysis(BaseAnalysis):
 			# Radius
 			radii_list = RadiiListFromSettings(pstalgo, self._props)
 
-			columns = []
-
 			radii_progress = TaskSplitProgressDelegate(len(radii_list), "Performing analysis", progress)
 			for radii in radii_list:
 				radii_sub_progress = MultiTaskProgressDelegate(radii_progress)
@@ -91,6 +89,7 @@ class AngularIntegrationAnalysis(BaseAnalysis):
 					radii_sub_progress.addTask(Tasks.NO_WEIGHT_ANALYSIS, 5, "Calculating angular integration")
 				radii_sub_progress.addTask(Tasks.WRITE_RESULTS, 1, "Writing results")
 				N_TD_MD_outputted = False
+				columns = []
 
 				# Length-weighted analysis
 				if need_length_weight_analysis:
@@ -163,19 +162,19 @@ class AngularIntegrationAnalysis(BaseAnalysis):
 						if props['output_MD']:
 							columns.append((ExtraColName(radii, ColName.EXTRA_MEAN_DEPTH), 'float', MeanDepthGen(total_depths, total_counts)))
 						N_TD_MD_outputted = True
-			radii_progress.nextTask()
+
+				# Write results for this radius
+				radii_sub_progress.setCurrentTask(Tasks.WRITE_RESULTS)
+				self._model.writeColumns(
+					self._props['in_network'],
+					line_rows,
+					columns,
+					radii_sub_progress)
+				radii_progress.nextTask()
 
 			# Free graph
 			pstalgo.FreeSegmentGraph(graph)
 			graph = None
-
-			# --- WRITE_RESULTS ---
-			progress.setCurrentTask(Tasks.WRITE_RESULTS)
-			self._model.writeColumns(
-				self._props['in_network'],
-				line_rows,
-				columns,
-				progress)
 
 		finally:
 			stack_allocator.restore(initial_alloc_state)
