@@ -243,20 +243,28 @@ def _graph_cache_key(model, network_table, unlink_table, point_table, poly_edge_
 		if table_name is None:
 			return None
 		layer = model._layerFromName(table_name)
+		if layer.isEditable():
+			return None  # sentinel: layer is editable
 		return (layer.id(), layer.source(), layer.featureCount())
 
-	return (
+	keys = [
 		layer_key(network_table),
 		layer_key(unlink_table),
 		layer_key(point_table),
-		poly_edge_point_interval,
-	)
+	]
+
+	# If any specified layer is editable, bypass cache entirely
+	tables = [network_table, unlink_table, point_table]
+	if any(k is None and t is not None for k, t in zip(keys, tables)):
+		return None
+
+	return (keys[0], keys[1], keys[2], poly_edge_point_interval)
 
 def BuildAxialGraphCached(model, pstalgo, stack_allocator, network_table, unlink_table, point_table, progress, poly_edge_point_interval=0):
 	global _CACHED_AXIAL_GRAPH
 
 	key = _graph_cache_key(model, network_table, unlink_table, point_table, poly_edge_point_interval)
-	if _CACHED_AXIAL_GRAPH is not None and _CACHED_AXIAL_GRAPH.key == key:
+	if key is not None and _CACHED_AXIAL_GRAPH is not None and _CACHED_AXIAL_GRAPH.key == key:
 		if progress is not None:
 			progress.setStatus("Reusing prepared graph")
 			progress.setProgress(1)
@@ -264,6 +272,7 @@ def BuildAxialGraphCached(model, pstalgo, stack_allocator, network_table, unlink
 
 	if _CACHED_AXIAL_GRAPH is not None:
 		_CACHED_AXIAL_GRAPH.free()
+		_CACHED_AXIAL_GRAPH = None
 
 	(graph, line_rows, point_rows) = BuildAxialGraph(
 		model,
@@ -274,8 +283,12 @@ def BuildAxialGraphCached(model, pstalgo, stack_allocator, network_table, unlink
 		point_table,
 		progress,
 		poly_edge_point_interval=poly_edge_point_interval)
-	_CACHED_AXIAL_GRAPH = _CachedAxialGraph(key, graph, line_rows, point_rows, pstalgo.FreeGraph)
-	return (graph, _CACHED_AXIAL_GRAPH.line_rows, _CACHED_AXIAL_GRAPH.point_rows)
+
+	if key is not None:
+		_CACHED_AXIAL_GRAPH = _CachedAxialGraph(key, graph, line_rows, point_rows, pstalgo.FreeGraph)
+		return (graph, _CACHED_AXIAL_GRAPH.line_rows, _CACHED_AXIAL_GRAPH.point_rows)
+	else:
+		return (graph, RowIdBuffer(line_rows), RowIdBuffer(point_rows) if point_rows is not None else None)
 
 def BuildSegmentGraph(model, pstalgo, stack_allocator, network_table, progress):
 	initial_alloc_state = stack_allocator.state()
