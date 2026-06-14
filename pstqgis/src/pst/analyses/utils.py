@@ -26,7 +26,6 @@ import atexit
 import ctypes
 import math
 import operator
-from itertools import product
 from .base import AnalysisException
 from qgis.core import QgsMessageLog, QgsRectangle, QgsProject, QgsProcessingUtils, QgsRasterDataProvider, QgsRasterLayer, QgsRasterShader, QgsColorRampShader, QgsSingleBandPseudoColorRenderer
 from osgeo import gdal
@@ -420,10 +419,11 @@ def RadiiListFromSettings(pstalgo, settings):
 		radii_values = RadiusValuesFromSetting(settings.get(setting_name), integer=integer)
 		if not radii_values:
 			raise ValueError("Please specify at least one radius value.")
-		radii_value_sets.append([(radii_name, value) for value in radii_values])
+		for value in radii_values:
+			radii_value_sets.append(pstalgo.Radii(**{radii_name: value}))
 	if not radii_value_sets:
 		return []
-	return [pstalgo.Radii(**dict(combo)) for combo in product(*radii_value_sets)]
+	return radii_value_sets
 
 def RadiiFromSettings(pstalgo, settings):
 	radii_list = RadiiListFromSettings(pstalgo, settings)
