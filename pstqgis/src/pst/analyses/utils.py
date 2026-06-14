@@ -21,8 +21,12 @@ along with PST. If not, see <http://www.gnu.org/licenses/>.
 
 from builtins import range
 from builtins import object
+import ast
 import atexit
 import ctypes
+import math
+import operator
+from itertools import product
 from .base import AnalysisException
 from qgis.core import QgsMessageLog, QgsRectangle, QgsProject, QgsProcessingUtils, QgsRasterDataProvider, QgsRasterLayer, QgsRasterShader, QgsColorRampShader, QgsSingleBandPseudoColorRenderer
 from osgeo import gdal
@@ -306,13 +310,126 @@ def BuildSegmentGraph(model, pstalgo, stack_allocator, network_table, progress):
 	stack_allocator.restore(final_alloc_state)
 	return (graph, line_rows)
 
+_RADIUS_EXPR_FUNCS = {
+	'abs': abs,
+	'ceil': math.ceil,
+	'floor': math.floor,
+	'max': max,
+	'min': min,
+	'pow': pow,
+	'range': range,
+	'round': round,
+	'sqrt': math.sqrt,
+}
+
+_RADIUS_EXPR_NAMES = {
+	'e': math.e,
+	'pi': math.pi,
+	'tau': getattr(math, 'tau', 2 * math.pi),
+}
+
+_RADIUS_EXPR_BINOPS = {
+	ast.Add: operator.add,
+	ast.Sub: operator.sub,
+	ast.Mult: operator.mul,
+	ast.Div: operator.truediv,
+	ast.FloorDiv: operator.floordiv,
+	ast.Mod: operator.mod,
+	ast.Pow: operator.pow,
+}
+
+_RADIUS_EXPR_UNARYOPS = {
+	ast.UAdd: operator.pos,
+	ast.USub: operator.neg,
+}
+
+def _EvaluateRadiusExpression(node):
+	if isinstance(node, ast.Constant):
+		if isinstance(node.value, (int, float)):
+			return node.value
+		raise ValueError("Unsupported literal in radius expression")
+	if isinstance(node, ast.Num):  # pragma: no cover - Python < 3.8
+		return node.n
+	if isinstance(node, ast.List):
+		return [_EvaluateRadiusExpression(elt) for elt in node.elts]
+	if isinstance(node, ast.Tuple):
+		return tuple(_EvaluateRadiusExpression(elt) for elt in node.elts)
+	if isinstance(node, ast.Set):
+		return [_EvaluateRadiusExpression(elt) for elt in node.elts]
+	if isinstance(node, ast.BinOp):
+		op = _RADIUS_EXPR_BINOPS.get(type(node.op))
+		if op is None:
+			raise ValueError("Unsupported operator in radius expression")
+		return op(_EvaluateRadiusExpression(node.left), _EvaluateRadiusExpression(node.right))
+	if isinstance(node, ast.UnaryOp):
+		op = _RADIUS_EXPR_UNARYOPS.get(type(node.op))
+		if op is None:
+			raise ValueError("Unsupported unary operator in radius expression")
+		return op(_EvaluateRadiusExpression(node.operand))
+	if isinstance(node, ast.Name):
+		if node.id not in _RADIUS_EXPR_NAMES:
+			raise ValueError("Unsupported name in radius expression")
+		return _RADIUS_EXPR_NAMES[node.id]
+	if isinstance(node, ast.Call):
+		if not isinstance(node.func, ast.Name) or node.func.id not in _RADIUS_EXPR_FUNCS:
+			raise ValueError("Unsupported function in radius expression")
+		if node.keywords:
+			raise ValueError("Keyword arguments are not supported in radius expressions")
+		func = _RADIUS_EXPR_FUNCS[node.func.id]
+		args = [_EvaluateRadiusExpression(arg) for arg in node.args]
+		return func(*args)
+	raise ValueError("Unsupported syntax in radius expression")
+
+def RadiusValuesFromSetting(value, integer=False):
+	if value is None:
+		return []
+	if isinstance(value, (int, float)):
+		values = [value]
+	else:
+		expression = str(value).strip()
+		if not expression:
+			return []
+		parsed = ast.parse(expression, mode='eval')
+		values = _EvaluateRadiusExpression(parsed.body)
+		if isinstance(values, range):
+			values = list(values)
+		elif not isinstance(values, (list, tuple)):
+			values = [values]
+	converted = []
+	for raw_value in values:
+		if integer:
+			converted_value = int(round(float(raw_value)))
+		else:
+			converted_value = float(raw_value)
+		if converted_value != 0:
+			converted.append(converted_value)
+	return converted
+
+def RadiiListFromSettings(pstalgo, settings):
+	value_specs = [
+		('rad_straight', 'straight', False),
+		('rad_walking', 'walking', False),
+		('rad_steps', 'steps', True),
+		('rad_angular', 'angular', False),
+		('rad_axmeter', 'axmeter', False),
+	]
+	radii_value_sets = []
+	for setting_name, radii_name, integer in value_specs:
+		if not settings.get(setting_name + '_enabled'):
+			continue
+		radii_values = RadiusValuesFromSetting(settings.get(setting_name), integer=integer)
+		if not radii_values:
+			raise ValueError("Please specify at least one radius value.")
+		radii_value_sets.append([(radii_name, value) for value in radii_values])
+	if not radii_value_sets:
+		return []
+	return [pstalgo.Radii(**dict(combo)) for combo in product(*radii_value_sets)]
+
 def RadiiFromSettings(pstalgo, settings):
-	return pstalgo.Radii(
-		straight = settings['rad_straight'] if settings.get('rad_straight_enabled') else None,
-		walking =  settings['rad_walking']  if settings.get('rad_walking_enabled')  else None,
-		steps =    settings['rad_steps']    if settings.get('rad_steps_enabled')    else None,
-		angular =  settings['rad_angular']  if settings.get('rad_angular_enabled')  else None,
-		axmeter =  settings['rad_axmeter']  if settings.get('rad_axmeter_enabled')  else None)
+	radii_list = RadiiListFromSettings(pstalgo, settings)
+	if radii_list:
+		return radii_list[0]
+	return pstalgo.Radii()
 
 def DistanceTypesFromSettings(pstalgo, props):
 	distance_types = []

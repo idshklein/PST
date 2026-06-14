@@ -43,6 +43,11 @@ from ..analyses import (
 )
 from .processing_analysis_delegate import ProcessingAnalysisDelegate
 from .processing_qgis_model import ProcessingQgisModel
+from ..analyses.utils import RadiusValuesFromSetting
+
+
+def _radius_values_from_props(props, entries):
+    return [RadiusValuesFromSetting(props[name], integer=integer) for name, integer in entries]
 
 
 class PstProcessingAlgorithmBase(QgsProcessingAlgorithm):
@@ -117,7 +122,7 @@ class AngularBetweennessAlgorithm(PstProcessingAlgorithmBase):
         props['norm_normalization'] = self.parameterAsBool(parameters, self.NORM_NORMALIZATION, context)
         props['norm_standard'] = self.parameterAsBool(parameters, self.NORM_STANDARD, context)
         props['norm_syntax'] = self.parameterAsBool(parameters, self.NORM_SYNTAX, context)
-        props['rad_walking'] = self.parameterAsDouble(parameters, self.RADIUS_WALKING, context)
+        props['rad_walking'] = self.parameterAsString(parameters, self.RADIUS_WALKING, context)
         props['rad_walking_enabled'] = bool(props['rad_walking'])
         props['rad_straight'] = 0
         props['rad_straight_enabled'] = False
@@ -141,7 +146,12 @@ class AngularBetweennessAlgorithm(PstProcessingAlgorithmBase):
                 and not self.parameterAsBool(parameters, self.NORM_STANDARD, context)
                 and not self.parameterAsBool(parameters, self.NORM_SYNTAX, context)):
             return (False, 'Please select at least one normalization mode.')
-        if not self.parameterAsDouble(parameters, self.RADIUS_WALKING, context):
+        props = self._collectProperties(parameters, context)
+        try:
+            radius_values = _radius_values_from_props(props, [('rad_walking', False)])
+        except Exception as e:
+            return (False, str(e))
+        if not any(radius_values):
             return (False, 'Please specify a walking radius.')
         return (True, None)
 
@@ -246,9 +256,9 @@ class SegmentGroupIntegrationAlgorithm(PstProcessingAlgorithmBase):
         props['in_network'] = self.NETWORK
         props['angle_threshold'] = self.parameterAsDouble(parameters, self.ANGLE_THRESHOLD, context)
         props['split_at_junctions'] = self.parameterAsBool(parameters, self.SPLIT_AT_JUNCTIONS, context)
-        props['rad_walking'] = self.parameterAsDouble(parameters, self.RADIUS_WALKING, context)
+        props['rad_walking'] = self.parameterAsString(parameters, self.RADIUS_WALKING, context)
         props['rad_walking_enabled'] = bool(props['rad_walking'])
-        props['rad_steps'] = self.parameterAsInt(parameters, self.RADIUS_STEPS, context)
+        props['rad_steps'] = self.parameterAsString(parameters, self.RADIUS_STEPS, context)
         props['rad_steps_enabled'] = bool(props['rad_steps'])
         props['rad_straight'] = 0
         props['rad_straight_enabled'] = False
@@ -263,7 +273,14 @@ class SegmentGroupIntegrationAlgorithm(PstProcessingAlgorithmBase):
 
     def checkParameterValues(self, parameters, context):
         props = self._collectProperties(parameters, context)
-        if not props['rad_walking_enabled'] and not props['rad_steps_enabled']:
+        try:
+            radius_values = _radius_values_from_props(props, [
+                ('rad_walking', False),
+                ('rad_steps', True),
+            ])
+        except Exception as e:
+            return (False, str(e))
+        if not any(radius_values):
             return (False, 'Please specify at least one radius (walking or steps).')
         return (True, None)
 
@@ -317,15 +334,15 @@ def _collect_radii_props(alg, parameters, context,
                          axmeter_param=None):
     """Collect radius props from optional radius parameters."""
     props = {}
-    props['rad_straight'] = alg.parameterAsDouble(parameters, straight_param, context) if straight_param else 0
+    props['rad_straight'] = alg.parameterAsString(parameters, straight_param, context) if straight_param else ''
     props['rad_straight_enabled'] = bool(props['rad_straight'])
-    props['rad_walking'] = alg.parameterAsDouble(parameters, walking_param, context) if walking_param else 0
+    props['rad_walking'] = alg.parameterAsString(parameters, walking_param, context) if walking_param else ''
     props['rad_walking_enabled'] = bool(props['rad_walking'])
-    props['rad_steps'] = alg.parameterAsInt(parameters, steps_param, context) if steps_param else 0
+    props['rad_steps'] = alg.parameterAsString(parameters, steps_param, context) if steps_param else ''
     props['rad_steps_enabled'] = bool(props['rad_steps'])
-    props['rad_angular'] = alg.parameterAsDouble(parameters, angular_param, context) if angular_param else 0
+    props['rad_angular'] = alg.parameterAsString(parameters, angular_param, context) if angular_param else ''
     props['rad_angular_enabled'] = bool(props['rad_angular'])
-    props['rad_axmeter'] = alg.parameterAsDouble(parameters, axmeter_param, context) if axmeter_param else 0
+    props['rad_axmeter'] = alg.parameterAsString(parameters, axmeter_param, context) if axmeter_param else ''
     props['rad_axmeter_enabled'] = bool(props['rad_axmeter'])
     return props
 
@@ -426,8 +443,16 @@ class AttractionDistanceAlgorithm(PstProcessingAlgorithmBase):
                 and not self.parameterAsBool(parameters, self.DIST_AXMETER, context)):
             return (False, 'Please select at least one distance mode.')
         props = self._collectProperties(parameters, context)
-        if (not props['rad_straight_enabled'] and not props['rad_walking_enabled']
-                and not props['rad_steps_enabled'] and not props['rad_angular_enabled']):
+        try:
+            radius_values = _radius_values_from_props(props, [
+                ('rad_straight', False),
+                ('rad_walking', False),
+                ('rad_steps', True),
+                ('rad_angular', False),
+            ])
+        except Exception as e:
+            return (False, str(e))
+        if not any(radius_values):
             return (False, 'Please specify at least one radius.')
         if (props['dest_data_enabled']
                 and not self.parameterAsString(parameters, self.DEST_DATA, context)):
@@ -550,9 +575,17 @@ class AttractionReachAlgorithm(PstProcessingAlgorithmBase):
 
     def checkParameterValues(self, parameters, context):
         props = self._collectProperties(parameters, context)
-        if (not props['rad_straight_enabled'] and not props['rad_walking_enabled']
-                and not props['rad_steps_enabled'] and not props['rad_angular_enabled']
-                and not props['rad_axmeter_enabled']):
+        try:
+            radius_values = _radius_values_from_props(props, [
+                ('rad_straight', False),
+                ('rad_walking', False),
+                ('rad_steps', True),
+                ('rad_angular', False),
+                ('rad_axmeter', False),
+            ])
+        except Exception as e:
+            return (False, str(e))
+        if not any(radius_values):
             return (False, 'Please specify at least one radius.')
         if (props['dest_data_enabled']
                 and not self.parameterAsString(parameters, self.DEST_DATA, context)):
@@ -676,8 +709,16 @@ class AttractionBetweennessAlgorithm(PstProcessingAlgorithmBase):
                 and not self.parameterAsBool(parameters, self.NORM_STANDARD, context)):
             return (False, 'Please select at least one normalization mode.')
         props = self._collectProperties(parameters, context)
-        if (not props['rad_straight_enabled'] and not props['rad_walking_enabled']
-                and not props['rad_steps_enabled'] and not props['rad_angular_enabled']):
+        try:
+            radius_values = _radius_values_from_props(props, [
+                ('rad_straight', False),
+                ('rad_walking', False),
+                ('rad_steps', True),
+                ('rad_angular', False),
+            ])
+        except Exception as e:
+            return (False, str(e))
+        if not any(radius_values):
             return (False, 'Please specify at least one radius.')
         if (props['dest_data_enabled']
                 and not self.parameterAsString(parameters, self.DEST_DATA, context)):

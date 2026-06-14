@@ -25,7 +25,7 @@ from ..model import GeometryType
 from .base import BaseAnalysis
 from .columnnaming import ColName, GenColName
 from .memory import stack_allocator
-from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraph, DistanceTypesFromSettings, RadiiFromSettings, PointGen
+from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraph, DistanceTypesFromSettings, RadiiListFromSettings, PointGen
 from .attractiondistanceanalysis import AttractionValueGen, GenerateAttractionDataName, OriginTypeFromProps, ReadAttractionPoints
 
 
@@ -47,7 +47,7 @@ class AttractionReachAnalysis(BaseAnalysis):
 		# Weight mode enabled
 		weight_enabled = props['weight_enabled']
 
-		radii_list = RadiiFromSettings(pstalgo, props).split()  # Only applicable in non-weight mode
+		radii_list = RadiiListFromSettings(pstalgo, props)  # Only applicable in non-weight mode
 
 		# Distance modes - pairs of (distance type, radii), only applicable in weight mode
 		distance_modes = []

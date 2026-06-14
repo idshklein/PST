@@ -24,7 +24,7 @@ import ctypes
 from .base import BaseAnalysis
 from .columnnaming import ColName, GenColName
 from .memory import stack_allocator
-from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildSegmentGraph, RadiiFromSettings, MeanDepthGen
+from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildSegmentGraph, RadiiListFromSettings, MeanDepthGen
 
 
 class AngularBetweennessAnalysis(BaseAnalysis):
@@ -50,6 +50,8 @@ class AngularBetweennessAnalysis(BaseAnalysis):
 		def GenerateStatColumnName(stat, radii):
 			return GenColName(ColName.ANGULAR_BETWEENNESS, radii = radii, extra = stat)
 
+		radii_list = RadiiListFromSettings(pstalgo, self._props)
+
 		# Number of analyses
 		analysis_count = 0
 		if props['weight_none']:
@@ -65,9 +67,7 @@ class AngularBetweennessAnalysis(BaseAnalysis):
 			WRITE_RESULTS = 3
 		progress = MultiTaskProgressDelegate(delegate)
 		progress.addTask(Tasks.BUILD_GRAPH, 1, None)
-		progress.addTask(Tasks.ANALYSIS, 5*analysis_count, None)
-
-		radii = RadiiFromSettings(pstalgo, self._props)
+		progress.addTask(Tasks.ANALYSIS, 5*analysis_count*len(radii_list), None)
 
 		initial_alloc_state = stack_allocator.state()
 
@@ -89,68 +89,69 @@ class AngularBetweennessAnalysis(BaseAnalysis):
 			total_depth_weights = Vector(ctypes.c_float, line_count, stack_allocator, line_count) if props['weight_length'] else None
 
 			progress.setCurrentTask(Tasks.ANALYSIS)
-			analysis_progress = TaskSplitProgressDelegate(analysis_count, "", progress)
+			analysis_progress = TaskSplitProgressDelegate(analysis_count*len(radii_list), "", progress)
 
-			def DoAnalysis(weigh_by_length, output_counters):
-				# Analysis sub progress
-				analysis_sub_progress = MultiTaskProgressDelegate(analysis_progress)
-				analysis_sub_progress.addTask(Tasks.ANALYSIS, 3, "Performing analysis")
-				analysis_sub_progress.addTask(Tasks.WRITE_RESULTS, 1, "Writing results")
-				# Analysis
-				analysis_sub_progress.setCurrentTask(Tasks.ANALYSIS)
-				pstalgo.FastSegmentBetweenness(
-					graph_handle = graph,
-					distance_type = pstalgo.DistanceType.ANGULAR,
-					weigh_by_length = weigh_by_length,
-					radius = radii,
-					progress_callback = pstalgo.CreateAnalysisDelegateCallbackWrapper(analysis_sub_progress),
-					out_betweenness = scores,
-					out_node_count = total_counts,
-					out_total_depth = total_depths)
-				# Output
-				columns = []
-				if props['norm_none']:
-					columns.append((GenerateScoreColumnName(weigh_by_length, radii, ColName.NORM_NONE), 'float', scores.values()))
-				# Normalization
-				if scores_norm is not None:
-					pstalgo.AngularChoiceNormalize(scores, total_counts, scores.size(), scores_norm)
-					columns.append((GenerateScoreColumnName(weigh_by_length, radii, ColName.NORM_TURNER), 'float', scores_norm.values()))
-				# Standard normalization
-				if scores_std is not None:
-					pstalgo.StandardNormalize(scores, scores.size(), scores_std)
-					columns.append((GenerateScoreColumnName(weigh_by_length, radii, ColName.NORM_STANDARD), 'float', scores_std.values()))
-				# Syntax normalization (NACH)
-				# Note: FastSegmentBetweenness only computes total_depth (not total_depth_weight),
-				# so we use total_depths here. This differs from AngularChoice which can compute
-				# both total_depth and total_depth_weight depending on weigh_by_length setting.
-				if scores_syntax is not None:
-					pstalgo.AngularChoiceSyntaxNormalize(scores, total_depths, scores.size(), scores_syntax)
-					columns.append((GenerateScoreColumnName(weigh_by_length, radii, ColName.NORM_SYNTAX_NACH), 'float', scores_syntax.values()))
-				if output_counters:
-					# N
-					if props['output_N']:
-						columns.append((GenerateStatColumnName(ColName.EXTRA_NODE_COUNT, radii), 'integer',  total_counts.values()))
-					# TD
-					if props['output_TD']:
-						columns.append((GenerateStatColumnName(ColName.EXTRA_TOTAL_DEPTH, radii), 'float', total_depths.values()))
-					# MD
-					if props['output_MD']:
-						columns.append((GenerateStatColumnName(ColName.EXTRA_MEAN_DEPTH, radii), 'float', MeanDepthGen(total_depths, total_counts)))
-				# Write
-				analysis_sub_progress.setCurrentTask(Tasks.WRITE_RESULTS)
-				self._model.writeColumns(self._props['in_network'], line_rows, columns, analysis_sub_progress)
-				# Next task progress
-				analysis_progress.nextTask()
+			for radii in radii_list:
+				def DoAnalysis(weigh_by_length, output_counters):
+					# Analysis sub progress
+					analysis_sub_progress = MultiTaskProgressDelegate(analysis_progress)
+					analysis_sub_progress.addTask(Tasks.ANALYSIS, 3, "Performing analysis")
+					analysis_sub_progress.addTask(Tasks.WRITE_RESULTS, 1, "Writing results")
+					# Analysis
+					analysis_sub_progress.setCurrentTask(Tasks.ANALYSIS)
+					pstalgo.FastSegmentBetweenness(
+						graph_handle = graph,
+						distance_type = pstalgo.DistanceType.ANGULAR,
+						weigh_by_length = weigh_by_length,
+						radius = radii,
+						progress_callback = pstalgo.CreateAnalysisDelegateCallbackWrapper(analysis_sub_progress),
+						out_betweenness = scores,
+						out_node_count = total_counts,
+						out_total_depth = total_depths)
+					# Output
+					columns = []
+					if props['norm_none']:
+						columns.append((GenerateScoreColumnName(weigh_by_length, radii, ColName.NORM_NONE), 'float', scores.values()))
+					# Normalization
+					if scores_norm is not None:
+						pstalgo.AngularChoiceNormalize(scores, total_counts, scores.size(), scores_norm)
+						columns.append((GenerateScoreColumnName(weigh_by_length, radii, ColName.NORM_TURNER), 'float', scores_norm.values()))
+					# Standard normalization
+					if scores_std is not None:
+						pstalgo.StandardNormalize(scores, scores.size(), scores_std)
+						columns.append((GenerateScoreColumnName(weigh_by_length, radii, ColName.NORM_STANDARD), 'float', scores_std.values()))
+					# Syntax normalization (NACH)
+					# Note: FastSegmentBetweenness only computes total_depth (not total_depth_weight),
+					# so we use total_depths here. This differs from AngularChoice which can compute
+					# both total_depth and total_depth_weight depending on weigh_by_length setting.
+					if scores_syntax is not None:
+						pstalgo.AngularChoiceSyntaxNormalize(scores, total_depths, scores.size(), scores_syntax)
+						columns.append((GenerateScoreColumnName(weigh_by_length, radii, ColName.NORM_SYNTAX_NACH), 'float', scores_syntax.values()))
+					if output_counters:
+						# N
+						if props['output_N']:
+							columns.append((GenerateStatColumnName(ColName.EXTRA_NODE_COUNT, radii), 'integer',  total_counts.values()))
+						# TD
+						if props['output_TD']:
+							columns.append((GenerateStatColumnName(ColName.EXTRA_TOTAL_DEPTH, radii), 'float', total_depths.values()))
+						# MD
+						if props['output_MD']:
+							columns.append((GenerateStatColumnName(ColName.EXTRA_MEAN_DEPTH, radii), 'float', MeanDepthGen(total_depths, total_counts)))
+					# Write
+					analysis_sub_progress.setCurrentTask(Tasks.WRITE_RESULTS)
+					self._model.writeColumns(self._props['in_network'], line_rows, columns, analysis_sub_progress)
+					# Next task progress
+					analysis_progress.nextTask()
 
-			counters_outputed = False
+				counters_outputed = False
 
-			if props['weight_length']:
-				DoAnalysis(weigh_by_length = True, output_counters = not counters_outputed)
-				counters_outputed = True
+				if props['weight_length']:
+					DoAnalysis(weigh_by_length = True, output_counters = not counters_outputed)
+					counters_outputed = True
 
-			if props['weight_none']:
-				DoAnalysis(weigh_by_length = False, output_counters = not counters_outputed)
-				counters_outputed = True
+				if props['weight_none']:
+					DoAnalysis(weigh_by_length = False, output_counters = not counters_outputed)
+					counters_outputed = True
 
 		finally:
 			stack_allocator.restore(initial_alloc_state)

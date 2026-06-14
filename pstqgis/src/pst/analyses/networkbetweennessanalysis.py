@@ -25,7 +25,7 @@ import ctypes
 from .base import BaseAnalysis
 from .columnnaming import ColName, GenColName
 from .memory import stack_allocator
-from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraphCached, DistanceTypesFromSettings, RadiiFromSettings, MeanDepthGen
+from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraphCached, DistanceTypesFromSettings, RadiiListFromSettings, MeanDepthGen
 
 
 class NetworkBetweennessAnalysis(BaseAnalysis):
@@ -41,7 +41,7 @@ class NetworkBetweennessAnalysis(BaseAnalysis):
 		Vector = pstalgo.Vector
 		props = self._props
 
-		radii_list = RadiiFromSettings(pstalgo, self._props).split()
+		radii_list = RadiiListFromSettings(pstalgo, self._props)
 
 		# Distance modes
 		distance_modes = DistanceTypesFromSettings(pstalgo, props)

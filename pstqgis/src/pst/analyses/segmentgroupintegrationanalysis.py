@@ -25,7 +25,7 @@ import ctypes
 from .base import BaseAnalysis
 from .columnnaming import ColName, GenColName
 from .memory import stack_allocator
-from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildSegmentGraph, RadiiFromSettings, MeanDepthGen
+from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildSegmentGraph, RadiiListFromSettings, MeanDepthGen
 
 
 class SegmentGroupIntegrationAnalysis(BaseAnalysis):
@@ -41,7 +41,7 @@ class SegmentGroupIntegrationAnalysis(BaseAnalysis):
 		props = self._props
 		Vector = pstalgo.Vector
 
-		radii_list = RadiiFromSettings(pstalgo, self._props).split()
+		radii_list = RadiiListFromSettings(pstalgo, self._props)
 
 		# Tasks
 		class Tasks(object):

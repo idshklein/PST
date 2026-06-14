@@ -43,6 +43,11 @@ from ..analyses import (
 )
 from .processing_analysis_delegate import ProcessingAnalysisDelegate
 from .processing_qgis_model import ProcessingQgisModel
+from ..analyses.utils import RadiusValuesFromSetting
+
+
+def _radius_values_from_props(props, entries):
+    return [RadiusValuesFromSetting(props[name], integer=integer) for name, integer in entries]
 
 
 class PstProcessingAlgorithmBase(QgsProcessingAlgorithm):
@@ -91,10 +96,10 @@ class AngularIntegrationAlgorithm(PstProcessingAlgorithmBase):
         self.addParameter(QgsProcessingParameterBoolean(self.NORM_HILLIER, self.tr('Normalization (Hillier)'), defaultValue=False))
         self.addParameter(QgsProcessingParameterNumber(self.ANGLE_PRECISION, self.tr('Angle precision'), type=QgsProcessingParameterNumber.Integer, defaultValue=1, minValue=0))
         self.addParameter(QgsProcessingParameterNumber(self.ANGLE_THRESHOLD, self.tr('Angle threshold'), type=QgsProcessingParameterNumber.Double, defaultValue=0, minValue=0))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_STRAIGHT, self.tr('Straight radius'), optional=True, type=QgsProcessingParameterNumber.Double))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_WALKING, self.tr('Walking radius'), optional=True, type=QgsProcessingParameterNumber.Double))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_STEPS, self.tr('Steps radius'), optional=True, type=QgsProcessingParameterNumber.Integer))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_ANGULAR, self.tr('Angular radius'), optional=True, type=QgsProcessingParameterNumber.Double))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_STRAIGHT, self.tr('Straight radius (comma-separated or expression)'), optional=True))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_WALKING, self.tr('Walking radius (comma-separated or expression)'), optional=True))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_STEPS, self.tr('Steps radius (comma-separated or expression)'), optional=True))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_ANGULAR, self.tr('Angular radius (comma-separated or expression)'), optional=True))
         self.addParameter(QgsProcessingParameterBoolean(self.OUTPUT_N, self.tr('Output node count (N)'), defaultValue=True))
         self.addParameter(QgsProcessingParameterBoolean(self.OUTPUT_TD, self.tr('Output total depth (TD)'), defaultValue=True))
         self.addParameter(QgsProcessingParameterBoolean(self.OUTPUT_MD, self.tr('Output mean depth (MD)'), defaultValue=True))
@@ -109,13 +114,13 @@ class AngularIntegrationAlgorithm(PstProcessingAlgorithmBase):
         props['norm_hillier'] = self.parameterAsBool(parameters, self.NORM_HILLIER, context)
         props['angle_precision'] = self.parameterAsInt(parameters, self.ANGLE_PRECISION, context)
         props['angle_threshold'] = self.parameterAsDouble(parameters, self.ANGLE_THRESHOLD, context)
-        props['rad_straight'] = self.parameterAsDouble(parameters, self.RADIUS_STRAIGHT, context)
+        props['rad_straight'] = self.parameterAsString(parameters, self.RADIUS_STRAIGHT, context)
         props['rad_straight_enabled'] = bool(props['rad_straight'])
-        props['rad_walking'] = self.parameterAsDouble(parameters, self.RADIUS_WALKING, context)
+        props['rad_walking'] = self.parameterAsString(parameters, self.RADIUS_WALKING, context)
         props['rad_walking_enabled'] = bool(props['rad_walking'])
-        props['rad_steps'] = self.parameterAsInt(parameters, self.RADIUS_STEPS, context)
+        props['rad_steps'] = self.parameterAsString(parameters, self.RADIUS_STEPS, context)
         props['rad_steps_enabled'] = bool(props['rad_steps'])
-        props['rad_angular'] = self.parameterAsDouble(parameters, self.RADIUS_ANGULAR, context)
+        props['rad_angular'] = self.parameterAsString(parameters, self.RADIUS_ANGULAR, context)
         props['rad_angular_enabled'] = bool(props['rad_angular'])
         props['output_N'] = self.parameterAsBool(parameters, self.OUTPUT_N, context)
         props['output_TD'] = self.parameterAsBool(parameters, self.OUTPUT_TD, context)
@@ -131,7 +136,16 @@ class AngularIntegrationAlgorithm(PstProcessingAlgorithmBase):
                 and not self.parameterAsBool(parameters, self.NORM_HILLIER, context)):
             return (False, 'Please select at least one normalization mode.')
         props = self._collectProperties(parameters, context)
-        if not props['rad_straight_enabled'] and not props['rad_walking_enabled'] and not props['rad_steps_enabled'] and not props['rad_angular_enabled']:
+        try:
+            radius_values = _radius_values_from_props(props, [
+                ('rad_straight', False),
+                ('rad_walking', False),
+                ('rad_steps', True),
+                ('rad_angular', False),
+            ])
+        except Exception as e:
+            return (False, str(e))
+        if not any(radius_values):
             return (False, 'Please specify at least one radius.')
         return (True, None)
 
@@ -176,10 +190,10 @@ class AngularChoiceAlgorithm(PstProcessingAlgorithmBase):
         self.addParameter(QgsProcessingParameterBoolean(self.NORM_SYNTAX, self.tr('Syntax normalization (NACH)'), defaultValue=False))
         self.addParameter(QgsProcessingParameterNumber(self.ANGLE_PRECISION, self.tr('Angle precision'), type=QgsProcessingParameterNumber.Integer, defaultValue=1, minValue=0))
         self.addParameter(QgsProcessingParameterNumber(self.ANGLE_THRESHOLD, self.tr('Angle threshold'), type=QgsProcessingParameterNumber.Double, defaultValue=0, minValue=0))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_STRAIGHT, self.tr('Straight radius'), optional=True, type=QgsProcessingParameterNumber.Double))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_WALKING, self.tr('Walking radius'), optional=True, type=QgsProcessingParameterNumber.Double))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_STEPS, self.tr('Steps radius'), optional=True, type=QgsProcessingParameterNumber.Integer))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_ANGULAR, self.tr('Angular radius'), optional=True, type=QgsProcessingParameterNumber.Double))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_STRAIGHT, self.tr('Straight radius (comma-separated or expression)'), optional=True))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_WALKING, self.tr('Walking radius (comma-separated or expression)'), optional=True))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_STEPS, self.tr('Steps radius (comma-separated or expression)'), optional=True))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_ANGULAR, self.tr('Angular radius (comma-separated or expression)'), optional=True))
         self.addParameter(QgsProcessingParameterBoolean(self.OUTPUT_N, self.tr('Output node count (N)'), defaultValue=True))
         self.addParameter(QgsProcessingParameterBoolean(self.OUTPUT_TD, self.tr('Output total depth (TD)'), defaultValue=True))
         self.addParameter(QgsProcessingParameterBoolean(self.OUTPUT_MD, self.tr('Output mean depth (MD)'), defaultValue=True))
@@ -195,13 +209,13 @@ class AngularChoiceAlgorithm(PstProcessingAlgorithmBase):
         props['norm_syntax'] = self.parameterAsBool(parameters, self.NORM_SYNTAX, context)
         props['angle_precision'] = self.parameterAsInt(parameters, self.ANGLE_PRECISION, context)
         props['angle_threshold'] = self.parameterAsDouble(parameters, self.ANGLE_THRESHOLD, context)
-        props['rad_straight'] = self.parameterAsDouble(parameters, self.RADIUS_STRAIGHT, context)
+        props['rad_straight'] = self.parameterAsString(parameters, self.RADIUS_STRAIGHT, context)
         props['rad_straight_enabled'] = bool(props['rad_straight'])
-        props['rad_walking'] = self.parameterAsDouble(parameters, self.RADIUS_WALKING, context)
+        props['rad_walking'] = self.parameterAsString(parameters, self.RADIUS_WALKING, context)
         props['rad_walking_enabled'] = bool(props['rad_walking'])
-        props['rad_steps'] = self.parameterAsInt(parameters, self.RADIUS_STEPS, context)
+        props['rad_steps'] = self.parameterAsString(parameters, self.RADIUS_STEPS, context)
         props['rad_steps_enabled'] = bool(props['rad_steps'])
-        props['rad_angular'] = self.parameterAsDouble(parameters, self.RADIUS_ANGULAR, context)
+        props['rad_angular'] = self.parameterAsString(parameters, self.RADIUS_ANGULAR, context)
         props['rad_angular_enabled'] = bool(props['rad_angular'])
         props['output_N'] = self.parameterAsBool(parameters, self.OUTPUT_N, context)
         props['output_TD'] = self.parameterAsBool(parameters, self.OUTPUT_TD, context)
@@ -218,7 +232,16 @@ class AngularChoiceAlgorithm(PstProcessingAlgorithmBase):
                 and not self.parameterAsBool(parameters, self.NORM_SYNTAX, context)):
             return (False, 'Please select at least one normalization mode.')
         props = self._collectProperties(parameters, context)
-        if not props['rad_straight_enabled'] and not props['rad_walking_enabled'] and not props['rad_steps_enabled'] and not props['rad_angular_enabled']:
+        try:
+            radius_values = _radius_values_from_props(props, [
+                ('rad_straight', False),
+                ('rad_walking', False),
+                ('rad_steps', True),
+                ('rad_angular', False),
+            ])
+        except Exception as e:
+            return (False, str(e))
+        if not any(radius_values):
             return (False, 'Please specify at least one radius.')
         return (True, None)
 
@@ -261,10 +284,10 @@ class ReachAlgorithm(PstProcessingAlgorithmBase):
         self.addParameter(QgsProcessingParameterBoolean(self.CALC_LENGTH, self.tr('Calculate total length of reached lines'), defaultValue=True))
         self.addParameter(QgsProcessingParameterBoolean(self.CALC_AREA, self.tr('Calculate reached area'), defaultValue=True))
         self.addParameter(QgsProcessingParameterEnum(self.AREA_UNIT, self.tr('Area unit'), options=[entry[0] for entry in self._AREA_UNITS], defaultValue=0))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_STRAIGHT, self.tr('Straight radius'), optional=True, type=QgsProcessingParameterNumber.Double))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_WALKING, self.tr('Walking radius'), optional=True, type=QgsProcessingParameterNumber.Double))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_STEPS, self.tr('Steps radius'), optional=True, type=QgsProcessingParameterNumber.Integer))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_ANGULAR, self.tr('Angular radius'), optional=True, type=QgsProcessingParameterNumber.Double))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_STRAIGHT, self.tr('Straight radius (comma-separated or expression)'), optional=True))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_WALKING, self.tr('Walking radius (comma-separated or expression)'), optional=True))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_STEPS, self.tr('Steps radius (comma-separated or expression)'), optional=True))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_ANGULAR, self.tr('Angular radius (comma-separated or expression)'), optional=True))
 
     def _collectProperties(self, parameters, context):
         props = {}
@@ -277,13 +300,13 @@ class ReachAlgorithm(PstProcessingAlgorithmBase):
         props['calc_length'] = self.parameterAsBool(parameters, self.CALC_LENGTH, context)
         props['calc_area'] = self.parameterAsBool(parameters, self.CALC_AREA, context)
         props['area_unit'] = self._AREA_UNITS[self.parameterAsEnum(parameters, self.AREA_UNIT, context)][1]
-        props['rad_straight'] = self.parameterAsDouble(parameters, self.RADIUS_STRAIGHT, context)
+        props['rad_straight'] = self.parameterAsString(parameters, self.RADIUS_STRAIGHT, context)
         props['rad_straight_enabled'] = bool(props['rad_straight'])
-        props['rad_walking'] = self.parameterAsDouble(parameters, self.RADIUS_WALKING, context)
+        props['rad_walking'] = self.parameterAsString(parameters, self.RADIUS_WALKING, context)
         props['rad_walking_enabled'] = bool(props['rad_walking'])
-        props['rad_steps'] = self.parameterAsInt(parameters, self.RADIUS_STEPS, context)
+        props['rad_steps'] = self.parameterAsString(parameters, self.RADIUS_STEPS, context)
         props['rad_steps_enabled'] = bool(props['rad_steps'])
-        props['rad_angular'] = self.parameterAsDouble(parameters, self.RADIUS_ANGULAR, context)
+        props['rad_angular'] = self.parameterAsString(parameters, self.RADIUS_ANGULAR, context)
         props['rad_angular_enabled'] = bool(props['rad_angular'])
         return props
 
@@ -291,7 +314,16 @@ class ReachAlgorithm(PstProcessingAlgorithmBase):
         props = self._collectProperties(parameters, context)
         if not props['calc_count'] and not props['calc_length'] and not props['calc_area']:
             return (False, 'Please select at least one reach output.')
-        if not props['rad_straight_enabled'] and not props['rad_walking_enabled'] and not props['rad_steps_enabled'] and not props['rad_angular_enabled']:
+        try:
+            radius_values = _radius_values_from_props(props, [
+                ('rad_straight', False),
+                ('rad_walking', False),
+                ('rad_steps', True),
+                ('rad_angular', False),
+            ])
+        except Exception as e:
+            return (False, str(e))
+        if not any(radius_values):
             return (False, 'Please specify at least one radius.')
         return (True, None)
 
@@ -320,7 +352,7 @@ class NetworkIntegrationAlgorithm(PstProcessingAlgorithmBase):
     def initAlgorithm(self, config):
         self.addParameter(QgsProcessingParameterVectorLayer(self.NETWORK, self.tr('Axial network'), types=[QgsProcessing.TypeVectorLine]))
         self.addParameter(QgsProcessingParameterFeatureSource(self.UNLINKS, self.tr('Unlinks'), types=[QgsProcessing.TypeVectorPoint], optional=True))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_STEPS, self.tr('Steps radius'), optional=True, type=QgsProcessingParameterNumber.Integer))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_STEPS, self.tr('Steps radius (comma-separated or expression)'), optional=True))
         self.addParameter(QgsProcessingParameterBoolean(self.OUTPUT_N, self.tr('Output node count (N)'), defaultValue=True))
         self.addParameter(QgsProcessingParameterBoolean(self.OUTPUT_TD, self.tr('Output total depth (TD)'), defaultValue=True))
         self.addParameter(QgsProcessingParameterBoolean(self.OUTPUT_MD, self.tr('Output mean depth (MD)'), defaultValue=True))
@@ -331,7 +363,7 @@ class NetworkIntegrationAlgorithm(PstProcessingAlgorithmBase):
         props['in_network'] = self.NETWORK
         props['in_unlinks'] = self.UNLINKS
         props['in_unlinks_enabled'] = self.parameterAsVectorLayer(parameters, self.UNLINKS, context) is not None
-        props['rad_steps'] = self.parameterAsInt(parameters, self.RADIUS_STEPS, context)
+        props['rad_steps'] = self.parameterAsString(parameters, self.RADIUS_STEPS, context)
         props['rad_steps_enabled'] = bool(props['rad_steps'])
         props['output_N'] = self.parameterAsBool(parameters, self.OUTPUT_N, context)
         props['output_TD'] = self.parameterAsBool(parameters, self.OUTPUT_TD, context)
@@ -341,7 +373,11 @@ class NetworkIntegrationAlgorithm(PstProcessingAlgorithmBase):
 
     def checkParameterValues(self, parameters, context):
         props = self._collectProperties(parameters, context)
-        if not props['rad_steps_enabled']:
+        try:
+            radius_values = _radius_values_from_props(props, [('rad_steps', True)])
+        except Exception as e:
+            return (False, str(e))
+        if not any(radius_values):
             return (False, 'Please specify a steps radius.')
         return (True, None)
 
@@ -392,10 +428,10 @@ class NetworkBetweennessAlgorithm(PstProcessingAlgorithmBase):
         self.addParameter(QgsProcessingParameterString(self.WEIGHT_DATA_NAME, self.tr('Data name (used in output column)'), optional=True))
         self.addParameter(QgsProcessingParameterBoolean(self.NORM_NONE, self.tr('No normalization'), defaultValue=True))
         self.addParameter(QgsProcessingParameterBoolean(self.NORM_STANDARD, self.tr('Standard normalization (0-1)'), defaultValue=False))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_STRAIGHT, self.tr('Straight radius'), optional=True, type=QgsProcessingParameterNumber.Double))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_WALKING, self.tr('Walking radius'), optional=True, type=QgsProcessingParameterNumber.Double))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_STEPS, self.tr('Steps radius'), optional=True, type=QgsProcessingParameterNumber.Integer))
-        self.addParameter(QgsProcessingParameterNumber(self.RADIUS_ANGULAR, self.tr('Angular radius'), optional=True, type=QgsProcessingParameterNumber.Double))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_STRAIGHT, self.tr('Straight radius (comma-separated or expression)'), optional=True))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_WALKING, self.tr('Walking radius (comma-separated or expression)'), optional=True))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_STEPS, self.tr('Steps radius (comma-separated or expression)'), optional=True))
+        self.addParameter(QgsProcessingParameterString(self.RADIUS_ANGULAR, self.tr('Angular radius (comma-separated or expression)'), optional=True))
         self.addParameter(QgsProcessingParameterBoolean(self.OUTPUT_N, self.tr('Output node count (N)'), defaultValue=True))
         self.addParameter(QgsProcessingParameterBoolean(self.OUTPUT_TD, self.tr('Output total depth (TD)'), defaultValue=True))
         self.addParameter(QgsProcessingParameterBoolean(self.OUTPUT_MD, self.tr('Output mean depth (MD)'), defaultValue=True))
@@ -415,13 +451,13 @@ class NetworkBetweennessAlgorithm(PstProcessingAlgorithmBase):
         props['weight_data_name'] = self.parameterAsString(parameters, self.WEIGHT_DATA_NAME, context)
         props['norm_none'] = self.parameterAsBool(parameters, self.NORM_NONE, context)
         props['norm_standard'] = self.parameterAsBool(parameters, self.NORM_STANDARD, context)
-        props['rad_straight'] = self.parameterAsDouble(parameters, self.RADIUS_STRAIGHT, context)
+        props['rad_straight'] = self.parameterAsString(parameters, self.RADIUS_STRAIGHT, context)
         props['rad_straight_enabled'] = bool(props['rad_straight'])
-        props['rad_walking'] = self.parameterAsDouble(parameters, self.RADIUS_WALKING, context)
+        props['rad_walking'] = self.parameterAsString(parameters, self.RADIUS_WALKING, context)
         props['rad_walking_enabled'] = bool(props['rad_walking'])
-        props['rad_steps'] = self.parameterAsInt(parameters, self.RADIUS_STEPS, context)
+        props['rad_steps'] = self.parameterAsString(parameters, self.RADIUS_STEPS, context)
         props['rad_steps_enabled'] = bool(props['rad_steps'])
-        props['rad_angular'] = self.parameterAsDouble(parameters, self.RADIUS_ANGULAR, context)
+        props['rad_angular'] = self.parameterAsString(parameters, self.RADIUS_ANGULAR, context)
         props['rad_angular_enabled'] = bool(props['rad_angular'])
         props['output_N'] = self.parameterAsBool(parameters, self.OUTPUT_N, context)
         props['output_TD'] = self.parameterAsBool(parameters, self.OUTPUT_TD, context)
@@ -440,7 +476,16 @@ class NetworkBetweennessAlgorithm(PstProcessingAlgorithmBase):
             return (False, 'Please select at least one weight data column.')
         if props['weight_data'] and not props['weight_data_name']:
             return (False, 'Please enter a data name for the weighted output columns.')
-        if not props['rad_straight_enabled'] and not props['rad_walking_enabled'] and not props['rad_steps_enabled'] and not props['rad_angular_enabled']:
+        try:
+            radius_values = _radius_values_from_props(props, [
+                ('rad_straight', False),
+                ('rad_walking', False),
+                ('rad_steps', True),
+                ('rad_angular', False),
+            ])
+        except Exception as e:
+            return (False, str(e))
+        if not any(radius_values):
             return (False, 'Please specify at least one radius.')
         return (True, None)
 

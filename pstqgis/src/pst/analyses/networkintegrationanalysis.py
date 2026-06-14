@@ -25,7 +25,7 @@ from ..model import GeometryType
 from .base import BaseAnalysis
 from .columnnaming import ColName, GenColName
 from .memory import stack_allocator
-from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraph, RadiiFromSettings, MeanDepthGen, PointGen
+from .utils import MultiTaskProgressDelegate, TaskSplitProgressDelegate, BuildAxialGraph, RadiiListFromSettings, MeanDepthGen, PointGen
 
 
 class NetworkIntegrationAnalysis(BaseAnalysis):
@@ -42,10 +42,7 @@ class NetworkIntegrationAnalysis(BaseAnalysis):
 
 		junctions_enabled = self._props['output_at_junctions']
 
-		#radii_list = RadiiFromSettings(pstalgo, self._props).split()
-		radii_list = [
-			pstalgo.Radii(steps = self._props['rad_steps'] if self._props.get('rad_steps_enabled') else None)
-		]
+		radii_list = RadiiListFromSettings(pstalgo, self._props)
 
 		# Tasks
 		class Tasks(object):
